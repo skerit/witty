@@ -23,35 +23,38 @@ is_array = lambda var: isinstance(var, (list, tuple))
 # All the open projects
 allProjects = {}
 
-# All the completions
-allCompletions = {}
+# The single point of contact for a project
+class Spoc:
 
-# All the types
-allTypes = {}
+	def __init__(self):
+		pass
 
-# All the globals
-allGlobals = {}
 
 # A Content File
-class Content:
+class FileContent:
 
-	def __init__(self, file_name):
+	def __init__(self, project, fileName):
 
-		self.file_name = file_name
+		# The project we're modifying
+		self.project = project
 
-		# Clear out allCompletions entry for this file
-		allCompletions[file_name] = {}
+		# The filename
+		self.fileName = fileName
 
 		# Open the original file
-		file_handler = open(file_name, 'rU')
+		fileHandle = open(fileName, 'rU')
 
 		# Read in the original file
-		self.original = file_handler.read()
+		self.original = fileHandle.read()
+
+		# Close the file
+		fileHandle.close()
 
 		# Set the working string to empty
 		self.working = ''
 
 		# Create the statements
+		self.textStatements = []
 		self.statements = []
 
 		# Create the scopes
@@ -59,7 +62,7 @@ class Content:
 		self.scopeDocBlocks = {}
 
 		# First we add an empty scope because 0 == False and all
-		self.createNewScope('empty', False)
+		self.createNewScope('global', False)
 		self.createNewScope('root', 0)
 
 		# Empty the blocks
@@ -73,15 +76,8 @@ class Content:
 		# Begin the second stage
 		self.secondStage()
 
-		# Expose everything
-		self.expose()
-
 		wf.log(self.scopes, 'scopes')
-		wf.log({file_name: self.statements, 'scopes': self.scopes})
-
-	# Export all the variables out
-	def expose(self):
-		allCompletions[self.file_name] = self.scopes
+		wf.log({fileName: self.textStatements, 'scopes': self.scopes})
 
 	# Begin parsing this file
 	def parseFile(self):
@@ -104,7 +100,7 @@ class Content:
 		# Recursively parse all the statements
 		statements = self.parseStatements(self.working, self.blocks)
 
-		self.statements = statements
+		self.textStatements = statements
 
 		return self.blocks
 
@@ -239,7 +235,7 @@ class Content:
 		results = []
 
 		# Recursively go through all the statements in this file
-		self.recurseStatObj(self.statements)
+		self.recurseStatObj(self.textStatements)
 
 		# Now do all the scope docblocks
 		for scope in self.scopes:
@@ -256,15 +252,20 @@ class Content:
 
 	def recurseStatObj(self, statements, parentStatement = False):
 		for stat in statements:
-			testObject = Statement(self.scopes, self.file_name, stat, parentStatement)
-			wf.log(testObject, 'statements')
+			# Create a Statement instance
+			tempObject = Statement(self.scopes, self.fileName, stat, parentStatement)
+
+			# Append it to the statements array
+			self.statements.append(tempObject)
+
+			wf.log(tempObject, 'statements')
 
 			# Now recursively do the subblocks and subscopes
 			if 'subscope' in stat:
-				self.recurseStatObj(stat['subscope'], testObject)
+				self.recurseStatObj(stat['subscope'], tempObject)
 
 			if 'subblock' in stat:
-				self.recurseStatObj(stat['subblock'], testObject)
+				self.recurseStatObj(stat['subblock'], tempObject)
 
 	# Guess what a statement does (assignment or expression) and to what variables
 	def guessLine(self, text):
@@ -369,7 +370,7 @@ class Statement:
 		# If the statement is a function
 		self.function = obj['function']
 
-		# The value is everything before the first ;
+		# The value is everything before the first semicolon
 		# If something else comes after that: tough luck
 		self.assignee = obj['value'].split(";")[0].strip()
 
@@ -405,9 +406,6 @@ class Statement:
 					if not piece in workingPiece['properties']:
 						workingPiece['properties'][piece] = {'name': piece, 'properties': {}}
 		
-			print('Var: ' + name)
-			print(self.variables)
-
 			#thisScope['variables'][name] = {'type': '?', 'name': name, 'description': ''}
 
 		# These should not be added to this scope, but the child scope
@@ -420,16 +418,13 @@ class Statement:
 
 class WittyParser(threading.Thread):
 
-	def __init__(self, collector, origin_file, open_folder_arr, timeout_seconds, globalCompletions):
-		print('Witty parser is starting...')
-		self.collector = collector
-		self.timeout = timeout_seconds
-		self.origin_file = origin_file
-		self.open_folder_arr = open_folder_arr
-		self.allCompletions = globalCompletions
+	def __init__(self, project, originFile): # collector, origin_file, open_folder_arr, timeout_seconds, globalCompletions):
+		self.project = project
+		self.originFile = originFile
 		threading.Thread.__init__(self)
 
-	def get_javascript_files(self, dir_name, *args):
+	# Get all javascript files (ending with .js, not containing .min.)
+	def getJavascriptFiles(self, dir_name, *args):
 		fileList = []
 		for file in os.listdir(dir_name):
 			dirfile = os.path.join(dir_name, file)
@@ -438,97 +433,237 @@ class WittyParser(threading.Thread):
 				if fileExtension == ".js" and ".min." not in fileName:
 					fileList.append(dirfile)
 			elif os.path.isdir(dirfile):
-				fileList += self.get_javascript_files(dirfile, *args)
+				fileList += self.getJavascriptFiles(dirfile, *args)
 		return fileList
 
-	def save_method_signature(self, file_name):
+	# Parse the given file and return a new FileContent object or False
+	def startFileParse(self, fileName):
 
-		if not wf.isJavascriptFile(file_name):
-			return
+		if not wf.isJavascriptFile(fileName):
+			return False
 
 		# If the filename is already present,
 		# and it's not the file we just saved, skip it
-		if file_name in self.allCompletions and file_name != self.origin_file:
-			return
+		if self.project.hasFileData(fileName) and fileName != self.originFile:
+			return False
 
-		nmCount = file_name.count('node_modules')
-		mvcCount = file_name.count('alchemymvc')
+		nmCount = fileName.count('node_modules')
+		mvcCount = fileName.count('alchemymvc')
 
 		# Skip node_module files (except for alchemy)
 		if nmCount and not mvcCount:
-			return
+			return False
 		elif nmCount > 1 and mvcCount:
-			return
+			return False
 		else:
-			sublime.status_message('Witty is parsing: ' + file_name)
-			results = Content(file_name)
+			sublime.status_message('Witty is parsing: ' + fileName)
+			fileResult = FileContent(self.project, fileName)
 
+			# If we got a new FileContent instance, store it in the project
+			if fileResult:
+				self.project.intel.files[fileName] = fileResult
+
+
+	# Function that begins the thread
 	def run(self):
-		#self.save_method_signature('/home/skerit/Projecten/alchemy-skeleton/node_modules/alchemymvc/lib/class/model.js')
-		#return
-		for folder in self.open_folder_arr:
-			jsfiles = self.get_javascript_files(folder)
-			for file_name in jsfiles:
-				self.save_method_signature(file_name)
+		
+		# Loop through every folder in the project
+		for folder in self.project.folders:
+			# Get all the javascript files in the project
+			jsFiles = self.getJavascriptFiles(folder)
+			for fileName in jsFiles:
+				self.startFileParse(fileName)
 
 		sublime.status_message('Witty has finished parsing')
 
-		if len(self.allCompletions):
-			# Pickle data
-			pfile = open('/dev/shm/wittypickle', 'wb')
-			pickle.dump(self.allCompletions, pfile)
+		# Fire the postParse function
+		self.project.intel.postParse()
 
+		# Store the data on disk
+		self.project.storeOnDisk()
+
+class Intel:
+
+	def __init__(self, project):
+
+		# The parent project
+		self.project = project
+
+		# Globals
+		self.globals = []
+
+		# Files
+		self.files = {}
+
+	def postParse(self):
+		
+		for name, f in self.files.items():
+			for s in f.statements:
+				if 'global' in s.variables:
+					for key, item in s.variables['global']['properties'].items():
+						self.globals.append(key)
+						
+
+		print('Globals:')
+		print(self.globals)
+
+class WittyProject:
+
+	# WittyProject Constructor
+	def __init__(self, folders):
+
+		# Update the final hash
+		self.id = wf.generateHash(folders)
+
+		# The pickle filename
+		self.pickleFileName = '/dev/shm/wittypickle-' + self.id
+
+		# Store the folders
+		self.folders = folders
+
+		# The Single Point Of Contact to get data
+		self.intel = None
+
+		# Init the intel
+		self._initIntel()
+		
+	# Begin parsing files
+	def parseFiles(self, savedFileName = ''):
+
+		# @todo: the thread can't be stored in this instance,
+		# because that breaks pickling
+		# Maybe store in an outside global?
+
+		# If a thread is already running: stop it
+		#if self._parserThread:
+		#	self.__parserThread.stop()
+
+		_parserThread = WittyParser(self, savedFileName)
+		_parserThread.start()
+
+	# Is data already available for this file?
+	def hasFileData(self, fileName):
+
+		# If data is empty, return false
+		if not self.intel:
+			return False
+
+		if fileName in self.intel.files:
+			return True
+
+		return False
+
+	# Store all the data on disk
+	def storeOnDisk(self):
+		if self.pickleFileName and self.intel and len(self.intel.files):
+			# Pickle data
+			pickleFile = open(self.pickleFileName, 'wb')
+			pickle.dump(self.intel, pickleFile)
+			pickleFile.close()
+
+	# Query for completions
+	def queryForCompletions(self, view, prefix, locations):
+
+		currentFileName = view.file_name()
+
+		if not wf.isJavascriptFile(currentFileName):
+			return
+
+
+		return [('Hooldingout', 'ForaHero')]
+
+
+	# Initially set the data by restoring or parsing
+	def _initIntel(self):
+
+		# Try to restore the data
+		jar = self._unpickle()
+
+		# If the jar is not empty, return the data
+		if jar and len(jar.files):
+			self.intel = jar
+		else:
+
+			# Create a new intel object
+			self.intel = Intel(self)
+
+			# The jar is empty, so start the parser, but return an empty dict
+			self.parseFiles()
+
+	# Try to get restore data previously put on the disk
+	def _unpickle(self):
+
+		data = {}
+
+		# Load in existing completions previously stored
+		try:
+			pickleFile = open(self.pickleFileName, 'rb')
+			try:
+				data = pickle.load(pickleFile)
+				pickleFile.close()
+			except EOFError:
+				print('Unable to unpickle')
+		except FileNotFoundError:
+			pass
+
+		return data
+
+
+
+# The Witty entrance
 class WittyCommand(sublime_plugin.EventListener):
 
 	_parser_thread = None
 
 	def __init__(self):
 
-		global allProjects
-		global allCompletions
+		self.allProjects = {}
 
 		for window in sublime.windows():
-			identifier = ''
-			for foldername in window.folders():
-				identifier += foldername
+			newProject = WittyProject(window.folders())
+			self.allProjects[newProject.id] = newProject
+	
+	# Get the project ID based on the view
+	def getProjectId(self, view):
+		projectFolders = view.window().folders()
+		return wf.generateHash(projectFolders)
 
-			allProjects[identifier] = {}
+	# Get the project
+	def getProject(self, view):
+		projectId = self.getProjectId(view)
 
-		# Load in existing completions previously stored
-		try:
-			pfile = open('/dev/shm/wittypickle', 'rb')
-			try:
-				allCompletions = pickle.load(pfile)
-			except EOFError:
-				print('Unable to unpickle')
-		except FileNotFoundError:
-			pass
-
-	def on_post_save_async(self, view):
-		if view.file_name().count('Witty.py'):
+		if projectId in self.allProjects:
+			return self.allProjects[projectId]
+		else:
 			return False
-		open_folder_arr = view.window().folders()
-		#if self._parser_thread != None:
-		#	self._parser_thread.stop()
-		self._parser_thread = WittyParser(self, view.file_name(), open_folder_arr, 30, allCompletions)
-		
-		self._parser_thread.start()
 
-	def on_modified(self, view):
-		# This runs on every keypress
-		#print("Testing on_modified")
-		#view.show_popup_menu(["moeder"], False)
-		return None
 
-	def on_query_context(self, view, key, operator, operand, match_all):
-		return None
+	# After saving a file, reparse it
+	def on_post_save_async(self, view):
 
+		savedFileName = view.file_name()
+
+		if savedFileName.count('Witty.py'):
+			return False
+
+		# Get the project
+		project = self.getProject(view)
+
+		if project:
+			project.parseFiles(savedFileName)
+
+	# Query completions
 	def on_query_completions(self, view, prefix, locations):
-		global allCompletions
+
+		project = self.getProject(view)
+
+		if project:
+			return project.queryForCompletions(view, prefix, locations)
+		
+		return
+
 		current_file = view.file_name()
 
-		if not wf.isJavascriptFile(current_file):
-			return
 
 		# Get the region
 		region = view.sel()[0]

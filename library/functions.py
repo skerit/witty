@@ -2,7 +2,7 @@
 # These functions are used throughout the Witty plugin,
 # and are mainly for getting information out of code
 #
-import os, re, threading, pprint, json, pickle
+import os, re, threading, pprint, json, pickle, hashlib
 test = 'hi'
 #
 # Regexes
@@ -46,8 +46,49 @@ pp = pprint.PrettyPrinter(indent=2)
 # Create a dictionary for open files
 openFiles = {}
 
+# Generate a hash
+def generateHash(data):
+	# Prepare the project id hash
+	hashId = hashlib.md5()
+
+	# Loop through all the folders to generate a hash
+	for folderName in data:
+		hashId.update(folderName.encode('utf-8'))
+
+	return hashId.hexdigest()
+
+def dictify(data, level=0):
+
+	if level > 2:
+		return data
+
+	upLevel = level + 1
+
+	# If the object is a dictionary
+	if isinstance(data, dict):
+		tempDict = {}
+
+		for key, value in data.items():
+			tempDict[key] = dictify(value, upLevel)
+
+		return tempDict
+
+	# If the object is a list
+	if isinstance(data, list):
+		tempList = []
+		for item in data:
+			tempList.append(dictify(item, upLevel))
+
+		return tempList
+
+	# If the object does not have a dict, return it
+	try:
+		return dictify(data.__dict__, upLevel)
+	except AttributeError:
+		return data
+
 # Log data to the given file in /dev/shm/ (memory fs)
-def log(data, filename='workfile'):
+def log(data, filename='workfile', doDictify=False):
 
 	global openFiles
 
@@ -55,7 +96,12 @@ def log(data, filename='workfile'):
 		openFiles[filename] = open('/dev/shm/' + filename, 'w')
 
 	try:
-		openFiles[filename].write('\n' + pp.pformat(data.__dict__))
+		if doDictify:
+			data = dictify(data)
+		else:
+			data = data.__dict__
+
+		openFiles[filename].write('\n' + pp.pformat(data)) # data.__dict__
 	except AttributeError:
 		openFiles[filename].write('\n' + pp.pformat(data))
 
