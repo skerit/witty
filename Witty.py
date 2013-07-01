@@ -1,36 +1,15 @@
-import sublime, sublime_plugin, os, re, threading, pprint, json, pickle
+import sublime, sublime_plugin, os, re, threading, json, pickle, imp
+import Witty.library.functions as wf
+import Witty.library.Docblock as Docblock
 from os.path import basename
 
-pp = pprint.PrettyPrinter(indent=2)
+# For development purposes
+settings = sublime.load_settings("Preferences.sublime-settings")
 
-openFiles = {}
-
-def log(data, filename='workfile'):
-	if not filename in openFiles:
-		openFiles[filename] = open('/dev/shm/' + filename, 'w')
-
-	try:
-		openFiles[filename].write('\n' + pp.pformat(data.__dict__))
-	except AttributeError:
-		openFiles[filename].write('\n' + pp.pformat(data))
-
-def is_javascript_file(filename):
-	return '.js' in filename
-
-def isFunctionDeclaration(text):
-	# If there is no function to be found, it definitely isn't one
-	if not text.count('function'):
-		return False
-
-	# 'function' appears somewhere, but how?
-
-	# Replace all strings with this placeholder
-	text = re.sub(reStrings, '"a"', text)
-
-	if text.count('function') > 0:
-		return True
-
-	return False
+if settings.get('env') == 'dev':
+	# This forces a reload of the modules
+	imp.reload(Docblock)
+	imp.reload(wf)
 
 # Remove all the types of a certain file
 def clear_types_file(filename):
@@ -38,42 +17,20 @@ def clear_types_file(filename):
 		if value['filename'] == filename:
 			del allTypes[key]
 
-
+# Is something an array?
 is_array = lambda var: isinstance(var, (list, tuple))
 
-# Match docblocks
-reBlocks = re.compile('(\/\*(.*?)\*/)', re.M|re.S)
-
-# Match descriptions
-reDescription = re.compile('\/\*(.*?)[@|\/]', re.M|re.S)
-
-# Docblock properties
-reAt = re.compile('^.*?@(\w+)?[ \t]*(.*)', re.M)
-
-# Simple single-line comments
-reComment = re.compile('^\s*\/\/.*', re.M)
-
-# All comments (including comments inside strings!)
-reComments = re.compile(r'''[ \t]*(?:\/\*(?:.(?!(?<=\*)\/))*\*\/|\/\/[^\n\r]*\n?\r?)''', re.M)
-
-# Get the function name (not the assigned var!)
-reFnName = re.compile('^.*function\s+(\w*?)\s*?\(', re.M)
-
-# Does this line begin with a function call?
-reFnCallBegin = re.compile('^\s*(?!\s)[\w\.\[\]]*\w\(', re.M)
-
-# Get assignment variable names
-reANames = re.compile('(\S*?)\s*\=(?!\=)', re.M)
-
-# Find strings (even with escaped ' and ")
-# Regex is actually (?<!\\)(?:(')|")(?(1)(\\'|[^'\r])+?'|(\\"|[^\r"])+?")
-reStrings = re.compile(r'''(?<!\\)(?:(')|")(?(1)(\\'|[^'\r])+?'|(\\"|[^\r"])+?")''', re.M)
+# All the open projects
+allProjects = {}
 
 # All the completions
 allCompletions = {}
 
 # All the types
 allTypes = {}
+
+# All the globals
+allGlobals = {}
 
 # A Content File
 class Content:
@@ -119,8 +76,8 @@ class Content:
 		# Expose everything
 		self.expose()
 
-		log(self.scopes, 'scopes')
-		log({file_name: self.statements, 'scopes': self.scopes})
+		wf.log(self.scopes, 'scopes')
+		wf.log({file_name: self.statements, 'scopes': self.scopes})
 
 	# Export all the variables out
 	def expose(self):
@@ -130,7 +87,7 @@ class Content:
 	def parseFile(self):
 
 		# Find all the docblocks in the original string
-		match = reBlocks.findall(self.original)
+		match = wf.reBlocks.findall(self.original)
 
 		self.blocks = []
 
@@ -139,10 +96,10 @@ class Content:
 				self.blocks.append(match_tupple[0])
 
 		# Remove all single line comments
-		self.working = re.sub(reComment, '', self.original)
+		self.working = re.sub(wf.reComment, '', self.original)
 
 		# Replace all the existing docblocks with a placeholder for easy parsing
-		self.working = re.sub(reBlocks, '//DOCBLOCK//', self.working)
+		self.working = re.sub(wf.reBlocks, '//DOCBLOCK//', self.working)
 
 		# Recursively parse all the statements
 		statements = self.parseStatements(self.working, self.blocks)
@@ -286,7 +243,7 @@ class Content:
 
 		# Now do all the scope docblocks
 		for scope in self.scopes:
-			docblock = DocBlock(self.scopeDocBlocks[scope['id']])
+			docblock = Docblock.Docblock(self.scopeDocBlocks[scope['id']])
 
 			# @todo: properties!
 			properties = docblock.getProperties()
@@ -297,37 +254,28 @@ class Content:
 			for pName, pValue in params.items():
 				scope['variables'][pName] = pValue
 
-	def recurseStatObj(self, statements):
+	def recurseStatObj(self, statements, parentStatement = False):
 		for stat in statements:
-			testObject = Statement(self.scopes, self.file_name, stat)
-			log(testObject, 'statements')
+			testObject = Statement(self.scopes, self.file_name, stat, parentStatement)
+			wf.log(testObject, 'statements')
 
 			# Now recursively do the subblocks and subscopes
 			if 'subscope' in stat:
-				self.recurseStatObj(stat['subscope'])
+				self.recurseStatObj(stat['subscope'], testObject)
 
 			if 'subblock' in stat:
-				self.recurseStatObj(stat['subblock'])
-
-	# Is this line a function call? (Does it begin with one)
-	def isFunctionCall(self, text):
-		match = reFnCallBegin.match(text)
-
-		if match:
-			return True
-		else:
-			return False
+				self.recurseStatObj(stat['subblock'], testObject)
 
 	# Guess what a statement does (assignment or expression) and to what variables
 	def guessLine(self, text):
-		result = {'type': 'expression', 'variables': [], 'function': False, 'value': '', 'info': {}}
+		result = {'type': 'expression', 'variables': [], 'function': False, 'value': '', 'info': {}, 'declaration': False}
 
 		text = re.sub('!==', '', text)
 		text = re.sub('!=', '', text)
 
 		eqs = text.count('=')
 
-		result['function'] = isFunctionDeclaration(text)
+		result['function'] = wf.isFunctionDeclaration(text)
 
 		# If there are no equal signs, it could be an expresison by default
 		if eqs == 0:
@@ -336,16 +284,17 @@ class Content:
 			if result['function']:
 
 				# Get the function name, if it has one
-				match = reFnName.match(text)
+				match = wf.reFnName.match(text)
 
 				if match and match.group(1):
 
 					result['info']['name'] = match.group(1)
 
 					# If this line is NOT a function call (so the given function is not a parameter)
-					if not self.isFunctionCall(text):
+					if not wf.isFunctionCall(text):
 						result['type'] = 'assignment'
 						result['variables'].append(match.group(1))
+						result['declaration'] = True
 
 		else:
 			# Count the equal signs part of comparisons
@@ -360,13 +309,17 @@ class Content:
 			# If all the equal signs are part of comparisons, return the result
 			if not eqs == comparisons:
 
-				# Replace possible 'var' text
-				temp = re.sub('var ', '', text)
+				temp = text
+
+				if temp.count('var '):
+					result['declaration'] = True
+					# Replace possible 'var' text
+					temp = re.sub('var ', '', temp)
 
 				# Split the value we're assigning of
 				split = temp.rsplit('=', 1)
 
-				variables = reANames.findall(text)
+				variables = wf.reANames.findall(text)
 				
 				for varname in variables:
 					if not varname.count('='):
@@ -378,126 +331,47 @@ class Content:
 
 		return result
 
-class DocBlock:
-
-	def __init__(self, text):
-		self.original = text
-		self.description = self.parseDescription()
-		self.properties = self.parseProperties()
-
-	# Get the description inside the given docblock text
-	def parseDescription(self):
-		text = self.original
-		description = reDescription.match(text)
-
-		if description:
-			description = description.group(1)
-			# Remove the leading stars
-			return re.sub('^\s?\*\s?', '', description, 0, re.M|re.S)
-		else:
-			return False
-
-	# Get all the properties of a docblock
-	def parseProperties(self):
-		text = self.original
-		match = reAt.findall(text)
-		properties = {}
-
-		for match_tupple in match:
-			property_name = match_tupple[0].lower()
-
-			if not (property_name in properties):
-				properties[property_name] = []
-
-			properties[property_name].append(match_tupple[1])
-
-		return properties
-
-	# Get the name property
-	def getName(self):
-		if 'name' in self.properties:
-			return self.properties['name']
-		
-		return []
-
-	# Parse param/property information
-	def parseParam(self, text):
-		result = {'type': '', 'name': '', 'description': ''}
-
-		name = ''
-		description = ''
-		typeName = ''
-
-		# Remove all double whitespaces
-		text = re.sub('\s+', ' ', text)
-
-		# Get the type
-		temp = text.split(' ', 1)
-
-		try:
-			name = temp[1]
-		except IndexError:
-			# If there is no name, there is no parameter
-			return False
-
-		typeName = temp[0]
-		result['type'] = re.sub('[\{\}]', '', typeName)
-
-		# Get the name
-		temp = name.split(' ', 1)
-
-		try:
-			description = temp[1]
-		except IndexError:
-			pass
-
-		name = temp[0].strip()
-
-		if not len(name):
-			return False
-
-		result['name'] = name
-		result['description'] = description
-
-		return result
-
-	# Return properties defined in the type-name-description format
-	def __getTypes(self, typeName):
-		result = {}
-
-		if typeName in self.properties:
-			for p in self.properties[typeName]:
-				temp = self.parseParam(p)
-
-				if temp:
-					result[temp['name']] = temp
-
-		return result
-
-	# Get the @property properties
-	def getProperties(self):
-		return self.__getTypes('property')
-
-	# Get the @param properties
-	def getParams(self):
-		return self.__getTypes('param')
-		
-
-
 class Statement:
 
-	def __init__(self, scopes, filename, obj):
+	def __init__(self, scopes, filename, obj, parentStatement = False):
 
 		statement = obj
 		thisScope = scopes[obj['scope']]
 
+		# The parent statement (the block this is a part of)
+		self.parent = parentStatement
+
+		# The filename this statement is in
 		self.filename = filename
-		self.docblock = DocBlock(obj['docblock'])
+
+		# The docblock of this statement
+		self.docblock = Docblock.Docblock(obj['docblock'])
+
+		# The type of this statement (assignment or expression)
 		self.type = obj['type']
+
+		# The blocktype this statement is in (function, if, switch, ...)
 		self.insideBlock = obj['insideBlock']
+
+		# The possible params (function)
 		self.params = {}
+
+		# The possible properties
 		self.properties = {}
-		self.variables = obj['variables']
+
+		# Modified variables
+		self.variables = {}
+
+		# If the variable has been declared
+		# @todo: This will unfortunately be false if a multiline var is used!
+		self.declaration = obj['declaration']
+
+		# If the statement is a function
+		self.function = obj['function']
+
+		# The value is everything before the first ;
+		# If something else comes after that: tough luck
+		self.assignee = obj['value'].split(";")[0].strip()
 
 		# Get this statement name, if any
 		self.name = self.docblock.getName()
@@ -512,7 +386,29 @@ class Statement:
 
 		# Add all the variables to the scope
 		for name in obj['variables']:
-			thisScope['variables'][name] = {'type': '?', 'name': name, 'description': ''}
+			tempName = name.replace('[\'', '.')
+			tempName = tempName.replace('\']', '')
+
+			#@todo: What to do with things like [i] or ['zever_'.i]
+
+			pieces = tempName.split('.')
+
+			workingPiece = self.variables
+
+			for index, piece in enumerate(pieces):
+				# If this is the first piece, it's the var name
+				if index == 0:
+					if not piece in self.variables:
+						self.variables[piece] = {'name': piece, 'properties': {}}
+					workingPiece = self.variables[piece]
+				else:
+					if not piece in workingPiece['properties']:
+						workingPiece['properties'][piece] = {'name': piece, 'properties': {}}
+		
+			print('Var: ' + name)
+			print(self.variables)
+
+			#thisScope['variables'][name] = {'type': '?', 'name': name, 'description': ''}
 
 		# These should not be added to this scope, but the child scope
 		#self.properties = self.docblock.getProperties()
@@ -520,13 +416,6 @@ class Statement:
 
 		#for pName, pValue in self.params.items():
 		#	thisScope['variables'].append(pName)
-
-
-
-
-
-
-
 
 
 class WittyParser(threading.Thread):
@@ -554,7 +443,7 @@ class WittyParser(threading.Thread):
 
 	def save_method_signature(self, file_name):
 
-		if not is_javascript_file(file_name):
+		if not wf.isJavascriptFile(file_name):
 			return
 
 		# If the filename is already present,
@@ -589,30 +478,22 @@ class WittyParser(threading.Thread):
 			pfile = open('/dev/shm/wittypickle', 'wb')
 			pickle.dump(self.allCompletions, pfile)
 
-
-# Get a better prefix
-def getBetterPrefix(text):
-
-	# Get everything after these chars, in this order
-	chars = [' ', '(', ')', '[', ']', '-', '+']
-
-	for needle in chars:
-		temp = text.rsplit(needle, 1)
-
-		# If it was found, save it as the result
-		try:
-			text = temp[1]
-		except IndexError:
-			pass
-
-	return text
-
 class WittyCommand(sublime_plugin.EventListener):
 
 	_parser_thread = None
 
 	def __init__(self):
+
+		global allProjects
 		global allCompletions
+
+		for window in sublime.windows():
+			identifier = ''
+			for foldername in window.folders():
+				identifier += foldername
+
+			allProjects[identifier] = {}
+
 		# Load in existing completions previously stored
 		try:
 			pfile = open('/dev/shm/wittypickle', 'rb')
@@ -646,7 +527,7 @@ class WittyCommand(sublime_plugin.EventListener):
 		global allCompletions
 		current_file = view.file_name()
 
-		if not is_javascript_file(current_file):
+		if not wf.isJavascriptFile(current_file):
 			return
 
 		# Get the region
@@ -689,7 +570,7 @@ class WittyCommand(sublime_plugin.EventListener):
 			except IndexError:
 				pass
 
-			if isFunctionDeclaration(l):
+			if wf.isFunctionDeclaration(l):
 				body = l.split('function', 1)[1]
 				
 				if body.count('{') > body.count('}'):
@@ -710,7 +591,7 @@ class WittyCommand(sublime_plugin.EventListener):
 		right_line = full_line[col:].strip()
 
 		# Get the better prefix
-		brefix = getBetterPrefix(left_line)
+		brefix = wf.getBetterPrefix(left_line)
 
 		try:
 			scopes = allCompletions[current_file]
