@@ -1,0 +1,17 @@
+[  
+{  
+	"id": "project",  
+	"children":  
+	[
+		{
+			"caption": "-"
+		},
+		{
+			"caption": "Witty Code Intel",
+			"children": [
+				{ "command": "witty_reindex_project", "caption": "Reindex Project Files" },
+			]
+		}  
+	]  
+}  
+]
