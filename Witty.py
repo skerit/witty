@@ -1,4 +1,4 @@
-import sublime, sublime_plugin, os, re, threading, json, pickle, imp
+import sublime, sublime_plugin, os, re, threading, json, pickle, imp, copy
 import Witty.library.functions as wf
 import Witty.library.Docblock as Docblock
 from os.path import basename
@@ -40,6 +40,7 @@ class FileContent:
 
 		# The filename
 		self.fileName = fileName
+		self.name = fileName
 
 		# Open the original file
 		fileHandle = open(fileName, 'rU')
@@ -253,7 +254,7 @@ class FileContent:
 	def recurseStatObj(self, statements, parentStatement = False):
 		for stat in statements:
 			# Create a Statement instance
-			tempObject = Statement(self.scopes, self.fileName, stat, parentStatement)
+			tempObject = WittyStatement(self.scopes, self.fileName, stat, parentStatement)
 
 			# Append it to the statements array
 			self.statements.append(tempObject)
@@ -332,12 +333,16 @@ class FileContent:
 
 		return result
 
-class Statement:
+class WittyStatement:
 
 	def __init__(self, scopes, filename, obj, parentStatement = False):
 
 		statement = obj
+
 		thisScope = scopes[obj['scope']]
+
+		# The original line
+		self.line = obj['line']
 
 		# The parent statement (the block this is a part of)
 		self.parent = parentStatement
@@ -353,6 +358,12 @@ class Statement:
 
 		# The blocktype this statement is in (function, if, switch, ...)
 		self.insideBlock = obj['insideBlock']
+
+		# The scope id
+		self.scopeId = obj['scope']
+
+		# The scope
+		self.scope = scopes[self.scopeId]
 
 		# The possible params (function)
 		self.params = {}
@@ -489,23 +500,461 @@ class Intel:
 		# The parent project
 		self.project = project
 
+		# Create the root scope
+		self.root = WittyRoot(self)
+
+		self.reset()
+
+	## Reset all the class variables
+	def reset(self):
+
+		# The scopes
+		self.scopes = []
+
+		# The scopes by filename
+		self.scopesByFilename = {}
+
+		# All the variables, no matter the scope
+		self.variables = []
+
 		# Globals
 		self.globals = []
 
 		# Files
 		self.files = {}
 
+	# Called after every parse, so every save
 	def postParse(self):
-		
-		for name, f in self.files.items():
-			for s in f.statements:
-				if 'global' in s.variables:
-					for key, item in s.variables['global']['properties'].items():
-						self.globals.append(key)
-						
 
-		print('Globals:')
-		print(self.globals)
+		# Reset everything
+		# @todo: we could make it only reset the currently saved file,
+		# but I haven't noticed any speed problems yet, so I'll do it later
+		self.reset()
+
+		# Begin the real work
+		for filename, wittyFile in self.files.items():
+
+			# Prepare all the scopes
+			# Here, we assume the file itself is also a scope
+			# That's kind-of true for node.js, but false for javascript
+			fileScope = self.root.addChildScope(wittyFile)
+			fileScope.setName(filename)
+			fileScope.makeFileScope(True)
+
+			# Make a temporary map of the scopes inside this file
+			scopeMap = {1: fileScope}
+
+			print('there are ' + str(len(wittyFile.scopes)) + ' scopes')
+
+			# Loop over every scope
+			for scope in wittyFile.scopes:
+
+				# Skip the first 2 scopes
+				if scope['id'] < 2:
+					continue
+
+				# Get this scope's parent scope
+				parentScope = scopeMap[scope['parent']]
+				
+				newScope = parentScope.addChildScope()
+				newScope.setName(scope['name'])
+				newScope.setIdInFile(scope['id'])
+
+				scopeMap[scope['id']] = newScope
+
+			#print(wittyFile.scopes)
+
+			for statement in wittyFile.statements:
+				# Get the statement's scope
+				statementScope = scopeMap[statement.scopeId]
+				statementScope.addVariable(statement)
+		
+		rv = self.root.variables
+
+		print('Witty has found ' + str(len(rv)) + ' global variables')
+
+		#testScope = self.getScope('/home/skerit/Projecten/witty-test-case/test.js', 'function(){')
+
+		#testvars = testScope.getAllVariables()
+
+		# for name, variable in testvars.items():
+		# 	print('Var: ' + name)
+		# 	print(variable.__dict__)
+		# 	print(variable.scope.name)
+
+		#test = self.getScope('/home/skerit/Projecten/alchemy-skeleton/node_modules/alchemymvc/lib/class/model.js', 'var Model = global.Model = alchemy.classes.BaseClass.extend(function Model (){')
+		#print(test.getAllVariables())
+
+
+		#for varId, variable in rv.items():
+			#print(str(variable.id) + ' == ' + variable.name)
+			#print(variable.statement.line)
+			#print(variable.statement.__dict__)
+			#pass
+
+
+	## Add a WittyVariable to the given scope without making a fuss
+	#  @param   self        The object pointer
+	#  @param   statement   A WittyStatement
+	#  @param   variable    The variable
+	#  
+	#  @returns newVar
+	def createEmptyVariable(self):
+
+		# Create the new variable
+		newVar = WittyVariable()
+
+		# Set the id
+		newVar.id = len(self.variables)
+
+		# Store it among ALL the variables
+		self.variables.append(newVar)
+
+		return newVar
+
+	## Get the scope from a specific file
+	#  @param   self        The object pointer
+	#  @param   filename    The filename the scope should be in
+	#  @param   scopename   The 'name' of the scope (fileline)
+	def getScope(self, filename, scopename):
+		if not filename in self.scopesByFilename:
+			wf.warn('File "' + filename + '" was not found while looking for scope "' + scopename + '"')
+			return False
+		else:
+			for scope in self.scopesByFilename[filename]:
+				if scope.name == scopename:
+					return scope
+
+	## Register the scope
+	def registerScope(self, scope):
+
+		# Get the new id for this scope
+		scope.id = len(self.scopes)
+
+		# And now add this scope to the project
+		self.scopes.append(scope)
+
+		# And add it to the scopes by filename
+		if not scope.parentFile.name in self.scopesByFilename:
+			self.scopesByFilename[scope.parentFile.name] = []
+
+		self.scopesByFilename[scope.parentFile.name].append(scope)
+
+
+class WittyScope:
+
+	# Every scope has a unique identifier (project-wide)
+	id = None
+
+	# Every scope also has an identifier inside the file
+	idInFile = None
+
+	# This is not the root scope by default
+	root = False
+
+	# Every scope has a 'name'
+	name = None
+
+	# Is this a file scope?
+	fileScope = False
+
+	# The parent of this scope
+	parent = None
+
+	# The file we're in
+	parentFile = None
+
+	# What project do we belong to?
+	project = None
+
+	# All our child scopes will go here
+	scopes = None
+
+	# All variables will end up here
+	variables = None
+
+	# Store variables by id here
+	variablesById = None
+
+	## Constructor
+	#  @param   self         The object pointer
+	#  @param   parent       The parent WittyScope
+	#  @param   parentFile   The file we're in
+	def __init__(self, parent, parentFile):
+
+		# Store the parent
+		self.parent = parent
+
+		# Store the file
+		self.parentFile = parentFile
+
+		# Store the project
+		self.project = parent.project
+
+		self.init()
+
+	## Another constructor for creating new objects
+	#  @param   self      The object pointer
+	def init(self):
+		self.scopes = {}
+		self.variables = {}
+		self.variablesById = {}
+
+	## Get the root scope
+	#  @param   self      The object pointer
+	def getRoot(self):
+		return self.project.intel.root
+
+	## Add a child scope, and return the new instance
+	#  @param   self      The object pointer
+	def addChildScope(self, parentFile = False):
+
+		if not parentFile:
+			parentFile = self.parentFile
+
+		# Create a new scope with ourselves as parent
+		newScope = WittyScope(self, parentFile)
+
+		self.project.intel.registerScope(newScope)
+
+		# Return the new scope
+		return newScope
+
+	## Set the scope idInFile, its id inside the file
+	#  @param   self     The object pointer
+	#  @param   id       The id of the scope inside the file
+	def setIdInFile(self, id):
+		self.idInFile = id
+
+	## Set the scope 'name'
+	#  @param   self     The object pointer
+	#  @param   name     The scope name
+	def setName(self, name):
+		self.name = name
+
+	## Set fileScope value
+	#  @param   self          The object pointer
+	#  @param   isFileScope   If it's a filescope or not
+	def makeFileScope(self, isFileScope):
+		self.fileScope = isFileScope
+
+		# Filescopes always have an internal id of 1
+		if (self.fileScope):
+			self.setIdInFile(1)
+
+	## Get the fileScope
+	#  @param   self          The object pointer
+	def getFileScope(self):
+
+		if self.fileScope:
+			return self
+		elif self.parent:
+			return self.parent.getFileScope()
+		else:
+			return False
+
+	## Find a specific variable
+	#  @param   self     The object pointer
+	#  @param   name     The variable name
+	#  @param   local    Only look in this scope?
+	def findVariable(self, name, local = False):
+
+		# If the variable is found, return it
+		if name in self.variables:
+			return self.variables[name]
+
+		# If we should not restrict ourselves to the local scope
+		if not local and self.parent:
+			return self.parent.findVariable(name)
+
+		return False
+
+	## Get all variables
+	#  @param   self     The object pointer
+	#  @param   local    Only look in this scope?
+	def getAllVariables(self, local = False):
+
+		# Variables we'll be working with
+		workingVariables = {}
+
+		# Get the upper variables if local is false
+		if not local and self.parent:
+			workingVariables = self.parent.getAllVariables()
+
+		# Make a SHALLOW copy of the variables in this scope
+		ourVariables = copy.copy(self.variables)
+
+		# Update the upper variables with our variables
+		workingVariables.update(ourVariables)
+
+		return workingVariables
+
+	## Register a variable inside this scope
+	#  @param   variable   The WittyVariable to register
+	def registerVariable(self, variable):
+
+		if not hasattr(variable, 'name'):
+			raise Exception("UnNamedVariable")
+
+		# Register it by its id
+		self.variablesById[variable.id] = variable
+
+		# Register it by its name
+		self.variables[variable.name] = variable
+
+
+	## Add variables to this scope
+	#  @param   self        The object pointer
+	#  @param   statement   A WittyStatement
+	#  @param   variable    The variable
+	def addVariable(self, statement, variable = None):
+
+		# If variable is undefined, use the statement
+		if not variable:
+			for varName, varInfo in statement.variables.items():
+				self.addVariable(statement, varInfo)
+			return
+
+		# Has this variable been declared inside this scope?
+		declared = statement.declaration
+
+		# Is there an existing variable in upper scopes?
+		existingVar = None
+
+		match = wf.reValidNameWithPoints.match(variable['name'])
+
+		if not match:
+			return
+
+		# The scope to use later on (self by default)
+		useScope = self
+
+		# If this is not a declaration (with var)
+		# we must see if it's an existing variable
+		# in upper scopes. If it's not, we'll
+		# add it to the global or module scope
+		if not declared:
+			existingVar = self.findVariable(variable['name'])
+
+			# If it's an existing var, add an appearance
+			if existingVar:
+				existingVar.addAppearance(statement, self)
+			else:
+				# @todo: In node.js you can't set something to the global by just omitting var
+				# So we'll have to find something for that
+				# Set the scope to the root scope (global)
+				#useScope = self.getRoot()
+
+				# Get the filescope
+				useScope = self.getFileScope()
+
+				# If it has not been found, raise an error
+				if not useScope: raise Exception('FileScope not found')
+
+		# Create a new empty variable (with the id set)
+		newVar = self.project.intel.createEmptyVariable()
+
+		# Set the scope
+		newVar.setScope(useScope)
+
+		# Set the statement
+		newVar.setStatement(statement)
+
+		# Set the name
+		newVar.setName(variable['name'])
+
+		if useScope.root:
+			print('Registering "' + variable['name'] +'" to scope "' + str(useScope.name) + '"')
+
+		# Add it to the correct scope
+		useScope.registerVariable(newVar)
+
+		return newVar
+
+
+class WittyRoot(WittyScope):
+
+	# The root scope is always id 0
+	id = 0
+
+	# This IS the root scope
+	root = True
+
+	def __init__(self, intel):
+
+		# Set the intel
+		self.intel = intel
+
+		# Set the parent project
+		self.project = intel.project
+
+		# Set the name
+		self.name = '::ROOT::'
+
+		# Init
+		self.init()
+
+		# Reset the project
+		self.resetIntel()
+
+	def resetIntel(self):
+		self.intel.scopes = []
+		self.intel.scopes.append(self)
+
+class WittyVariable:
+
+	# Every variable has a unique id
+	id = None
+
+	# What is the scope of this variable?
+	# This does NOT equal to where it was declared
+	# As global variables can be declared elsewhere
+	scope = None
+
+	# In what statement was this variable declared?
+	statement = None
+
+	# Where was this variable used?
+	statements = []
+
+	## Constructor
+	#  @param   self        The object pointer
+	#  @param   statement   The statement of declaration
+	#  @param   scope       The parent WittyScope
+	# def __init__(self, statement, scope):
+
+	# 	self.scope = scope
+	# 	self.statement = statement
+
+	## Set the name of this variable
+	#  @param   self        The object pointer
+	#  @param   name        The name of the variable
+	def setName(self, name):
+
+		match = wf.reValidNameWithPoints.match(name)
+
+		if not match:
+			raise Exception('This is not a valid variable name!')
+
+		self.name = name
+
+	## Set the scope
+	#  @param   scope       The parent WittyScope
+	def setScope(self, scope):
+		self.scope = scope
+
+	## Set the statement
+	#  @param   statement   The statement of declaration
+	def setStatement(self, statement):
+		self.statement = statement
+
+	## Indicate the variable was used here
+	#  @param   self        The object pointer
+	#  @param   scope       The scope where we appeared
+	#  @param   statement   The statement where we appeared
+	def addAppearance(self, scope, statement):
+		self.statements.append(statement)
+
 
 class WittyProject:
 
@@ -537,6 +986,7 @@ class WittyProject:
 		# If a thread is already running: stop it
 		#if self._parserThread:
 		#	self.__parserThread.stop()
+		wf.warn('\n\nStart parser »»» ' + savedFileName + ' «««\n')
 
 		_parserThread = WittyParser(self, savedFileName)
 		_parserThread.start()
@@ -593,6 +1043,8 @@ class WittyProject:
 	# Try to get restore data previously put on the disk
 	def _unpickle(self):
 
+		wf.warn('Witty is unpickling data')
+
 		data = {}
 
 		# Load in existing completions previously stored
@@ -608,6 +1060,10 @@ class WittyProject:
 
 		return data
 
+	## Get the scope from a specific file
+	def getScope(self, filename, scopename):
+		return self.intel.getScope(filename, scopename)
+
 
 
 # The Witty entrance
@@ -621,6 +1077,7 @@ class WittyCommand(sublime_plugin.EventListener):
 
 		for window in sublime.windows():
 			newProject = WittyProject(window.folders())
+			print('New project created')
 			self.allProjects[newProject.id] = newProject
 	
 	# Get the project ID based on the view
@@ -640,7 +1097,7 @@ class WittyCommand(sublime_plugin.EventListener):
 
 	# After saving a file, reparse it
 	def on_post_save_async(self, view):
-
+		
 		savedFileName = view.file_name()
 
 		if savedFileName.count('Witty.py'):
@@ -657,10 +1114,10 @@ class WittyCommand(sublime_plugin.EventListener):
 
 		project = self.getProject(view)
 
-		if project:
-			return project.queryForCompletions(view, prefix, locations)
+		#if project:
+		#	return project.queryForCompletions(view, prefix, locations)
 		
-		return
+		#return
 
 		current_file = view.file_name()
 
@@ -714,7 +1171,7 @@ class WittyCommand(sublime_plugin.EventListener):
 		try:
 			function_scope = stack[0]['line']
 		except IndexError:
-			function_scope = 'root'
+			function_scope = current_file
 
 		# Get the current line
 		full_line = view.substr(view.line(region))
@@ -728,54 +1185,66 @@ class WittyCommand(sublime_plugin.EventListener):
 		# Get the better prefix
 		brefix = wf.getBetterPrefix(left_line)
 
-		try:
-			scopes = allCompletions[current_file]
-		except KeyError:
-			print('Key not found: ' + current_file)
+		scope = project.getScope(current_file, function_scope)
+
+		if not scope:
 			return
-		
-		# Default to the first scope
-		found_scope = scopes[1]
-
-		for s in scopes:
-			if s['name'] == function_scope:
-				found_scope = s
-				break;
-
-		hierarchy = [found_scope]
-		workingScope = found_scope
-
-		# Determine the level of this scope
-		while workingScope['parent']:
-			workingScope = scopes[workingScope['parent']]
-			hierarchy.insert(0, workingScope)
-
-		#print('>>> found scope:')
-		#print(function_scope)
 
 		completions = []
-		temp = []
+
+		variables = scope.getAllVariables()
+
+		for varname, varinfo in variables.items():
+			completions.append((varname, varname))
+
+		# try:
+		# 	scopes = allCompletions[current_file]
+		# except KeyError:
+		# 	print('Key not found: ' + current_file)
+		# 	return
 		
-		for s in hierarchy:
+		# # Default to the first scope
+		# found_scope = scopes[1]
 
-			if not len(s['variables']):
-				continue
+		# for s in scopes:
+		# 	if s['name'] == function_scope:
+		# 		found_scope = s
+		# 		break;
 
-			# First order the variables
-			myvars = []
-			keys = list(s['variables'].keys())
-			keys.sort()
+		# hierarchy = [found_scope]
+		# workingScope = found_scope
 
-			#print(keys)
+		# # Determine the level of this scope
+		# while workingScope['parent']:
+		# 	workingScope = scopes[workingScope['parent']]
+		# 	hierarchy.insert(0, workingScope)
 
-			for k in keys:
-				myvars.append(s['variables'][k])
+		# #print('>>> found scope:')
+		# #print(function_scope)
 
-			# Then add them to the autocomplete list
-			for v in myvars:
-				completions.insert(0, (v['name'] + '\t' + v['type'], v['name']))
+		# completions = []
+		# temp = []
+		
+		# for s in hierarchy:
 
-		sublime.status_message('Auto completing "' + brefix + '"')
+		# 	if not len(s['variables']):
+		# 		continue
+
+		# 	# First order the variables
+		# 	myvars = []
+		# 	keys = list(s['variables'].keys())
+		# 	keys.sort()
+
+		# 	#print(keys)
+
+		# 	for k in keys:
+		# 		myvars.append(s['variables'][k])
+
+		# 	# Then add them to the autocomplete list
+		# 	for v in myvars:
+		# 		completions.insert(0, (v['name'] + '\t' + v['type'], v['name']))
+
+		# sublime.status_message('Auto completing "' + brefix + '"')
 
 		# INHIBIT_WORD_COMPLETIONS = 8 = Only show these completions
 		# INHIBIT_EXPLICIT_COMPLETIONS = 16 = ?

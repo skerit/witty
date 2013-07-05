@@ -36,6 +36,13 @@ reANames = re.compile('(\S*?)\s*\=(?!\=)', re.M)
 # Regex is actually (?<!\\)(?:(')|")(?(1)(\\'|[^'\r])+?'|(\\"|[^\r"])+?")
 reStrings = re.compile(r'''(?<!\\)(?:(')|")(?(1)(\\'|[^'\r])+?'|(\\"|[^\r"])+?")''', re.M)
 
+# Valid javascript variable name regex,
+# this does not include unicode stuff
+reValidName = re.compile('^(?!(?:do|if|in|for|let|new|try|var|case|else|enum|eval|false|null|this|true|void|with|break|catch|class|const|super|throw|while|yield|delete|export|import|public|return|static|switch|typeof|default|extends|finally|package|private|continue|debugger|function|arguments|interface|protected|implements|instanceof)$)[a-zA-Z_$][0-9a-zA-Z_$]*$')
+
+# The same as above, but allow points
+reValidNameWithPoints = re.compile('^(?!(?:do|if|in|for|let|new|try|var|case|else|enum|eval|false|null|this|true|void|with|break|catch|class|const|super|throw|while|yield|delete|export|import|public|return|static|switch|typeof|default|extends|finally|package|private|continue|debugger|function|arguments|interface|protected|implements|instanceof)$)[a-zA-Z_$][0-9a-zA-Z_$\.]*$')
+
 #
 # Log Functions
 #
@@ -104,6 +111,14 @@ def log(data, filename='workfile', doDictify=False):
 		openFiles[filename].write('\n' + pp.pformat(data)) # data.__dict__
 	except AttributeError:
 		openFiles[filename].write('\n' + pp.pformat(data))
+
+# Print out a warning to the console
+def warn(message):
+	print(message)
+
+# Debug function
+def pr(message):
+	print(message)
 
 #
 # String manipulators / searchers
