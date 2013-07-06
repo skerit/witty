@@ -6,10 +6,18 @@ from os.path import basename
 # For development purposes
 settings = sublime.load_settings("Preferences.sublime-settings")
 
+# Witty only completions?
+wittyOnly = settings.get('wittyonly')
+
 if settings.get('env') == 'dev':
 	# This forces a reload of the modules
 	imp.reload(Docblock)
 	imp.reload(wf)
+
+# Debug wrappers
+def warn(message, showStack = True): wf.warn(message, showStack, 3)
+def info(message, showStack = True): wf.info(message, showStack, 3)
+def pr(message, showStack = True): wf.pr(message, showStack, 3)
 
 # Remove all the types of a certain file
 def clear_types_file(filename):
@@ -124,8 +132,8 @@ class FileContent:
 	# Parsing statements begins here
 	def parseStatements(self, workingLines, docblocks, scopeId = 1, blockType = '', ignoreFirstNewBlock = False):
 
+		# Turn the text into an array of lines
 		if not is_array(workingLines):
-			# Turn the text into an array of lines
 			workingLines = workingLines.split('\n')
 
 		# Initial value: no statement is open
@@ -186,16 +194,28 @@ class FileContent:
 				ignoreFirstNewBlock = False
 
 		results = []
+		previousStatement = None
 
 		for stat in statements:
-			newStat = self.parseStat(stat, scopeId, blockType, ignoreFirstNewBlock)
+			newStat = self.parseStat(stat, scopeId, previousStatement, blockType, ignoreFirstNewBlock)
 			results.append(newStat)
+
+			# Store this new statement as the previous statement,
+			# so we can pass it on next time
+			previousStatement = newStat
 
 		return statements
 
-	# Find some additional information on a single line
-	def parseStat(self, statement, scopeId, blockType = '', ignoreFirstNewBlock = False):
-		temp = self.guessLine(statement['line'][0])
+	## Find some additional information on a single line
+	#  @param   self                The object pointer
+	#  @param   statement           A primitive statement object
+	#  @param   scopeId             The id of the scope it's in (id in the file)
+	#  @param   blockType           What kind of block it's in
+	#  @param   ignoreFirstNewBlock If the first line contains a block, ignore it
+	def parseStat(self, statement, scopeId, previousStatement, blockType = '', ignoreFirstNewBlock = False):
+
+		# Guess what a line is all about
+		temp = self.guessLine(statement['line'][0], previousStatement)
 
 		statement['insideBlock'] = blockType
 
@@ -268,8 +288,11 @@ class FileContent:
 			if 'subblock' in stat:
 				self.recurseStatObj(stat['subblock'], tempObject)
 
-	# Guess what a statement does (assignment or expression) and to what variables
-	def guessLine(self, text):
+	## Guess what a statement does (assignment or expression) and to what variables
+	#  @param   self               The object pointer
+	#  @param   text               The text to guess
+	#  @param   previousStatement  The previous statement (instance of WittyStatement)
+	def guessLine(self, text, previousStatement):
 		result = {'type': 'expression', 'variables': [], 'function': False, 'value': '', 'info': {}, 'declaration': False}
 
 		text = re.sub('!==', '', text)
@@ -279,8 +302,8 @@ class FileContent:
 
 		result['function'] = wf.isFunctionDeclaration(text)
 
-		# If there are no equal signs, it could be an expresison by default
-		if eqs == 0:
+		# If there are no equal signs, it could be an expression by default
+		if text.count('var ') == 0 and eqs == 0:
 
 			# See if it's a named function...
 			if result['function']:
@@ -309,6 +332,7 @@ class FileContent:
 			comparisons += temp.count('==') * 2
 			
 			# If all the equal signs are part of comparisons, return the result
+			# @todo: equal signs part of a string will throw this of!
 			if not eqs == comparisons:
 
 				temp = text
@@ -317,19 +341,45 @@ class FileContent:
 					result['declaration'] = True
 					# Replace possible 'var' text
 					temp = re.sub('var ', '', temp)
+				else:
+					# Maybe this is a multiline declaration?
+					if previousStatement and previousStatement['declaration'] and previousStatement['line'][0].strip().endswith(','):
+						result['declaration'] = True
+
 
 				# Split the value we're assigning of
 				split = temp.rsplit('=', 1)
 
-				variables = wf.reANames.findall(text)
-				
-				for varname in variables:
-					if not varname.count('='):
-						result['variables'].append(varname.strip())
+				# Replace all strings so there are no more ' or "
+				temp = re.sub(wf.reStrings, '__WITTY_STRING__', temp)
 
-				result['value'] = split[1]
+				# Split them by the comma
+				declarations = temp.rsplit(',')
 
-				result['type'] = 'assignment'
+				for dec in declarations:
+					dec = dec.strip()
+					dec = dec.split('=')
+					
+					varName = dec[0].strip()
+
+					try:
+						assignment = dec[1].strip()
+					except IndexError:
+						assignment = ''
+					
+					# If dec is an empty string, continue
+					if not dec:
+						continue
+
+					#print('Found: ' + varName + ' assigned with ' + assignment)
+
+					result['variables'].append(varName)
+
+					# @todo: since we can have multiple declarations per line, this needs to move!
+					result['value'] = ''
+
+					# @todo: same with this!
+					result['type'] = 'assignment'
 
 		return result
 
@@ -468,12 +518,13 @@ class WittyParser(threading.Thread):
 			return False
 		else:
 			sublime.status_message('Witty is parsing: ' + fileName)
+			info('Parsing file "' + fileName + '"')
+
 			fileResult = FileContent(self.project, fileName)
 
 			# If we got a new FileContent instance, store it in the project
 			if fileResult:
 				self.project.intel.files[fileName] = fileResult
-
 
 	# Function that begins the thread
 	def run(self):
@@ -503,6 +554,9 @@ class Intel:
 		# Create the root scope
 		self.root = WittyRoot(self)
 
+		# Files
+		self.files = {}
+
 		self.reset()
 
 	## Reset all the class variables
@@ -520,8 +574,8 @@ class Intel:
 		# Globals
 		self.globals = []
 
-		# Files
-		self.files = {}
+		# Also reset root (it'll add itself to the scopes)
+		self.root.resetIntel()
 
 	# Called after every parse, so every save
 	def postParse(self):
@@ -530,9 +584,12 @@ class Intel:
 		# @todo: we could make it only reset the currently saved file,
 		# but I haven't noticed any speed problems yet, so I'll do it later
 		self.reset()
+		info('Witty data has been reset, processing data ...')
 
 		# Begin the real work
 		for filename, wittyFile in self.files.items():
+
+			pr('Processing ' + filename)
 
 			# Prepare all the scopes
 			# Here, we assume the file itself is also a scope
@@ -570,8 +627,6 @@ class Intel:
 				statementScope.addVariable(statement)
 		
 		rv = self.root.variables
-
-		print('Witty has found ' + str(len(rv)) + ' global variables')
 
 		#testScope = self.getScope('/home/skerit/Projecten/witty-test-case/test.js', 'function(){')
 
@@ -986,7 +1041,7 @@ class WittyProject:
 		# If a thread is already running: stop it
 		#if self._parserThread:
 		#	self.__parserThread.stop()
-		wf.warn('\n\nStart parser »»» ' + savedFileName + ' «««\n')
+		info('Start parsing "' + savedFileName + '"')
 
 		_parserThread = WittyParser(self, savedFileName)
 		_parserThread.start()
@@ -1019,108 +1074,7 @@ class WittyProject:
 		if not wf.isJavascriptFile(currentFileName):
 			return
 
-
-		return [('Hooldingout', 'ForaHero')]
-
-
-	# Initially set the data by restoring or parsing
-	def _initIntel(self):
-
-		# Try to restore the data
-		jar = self._unpickle()
-
-		# If the jar is not empty, return the data
-		if jar and len(jar.files):
-			self.intel = jar
-		else:
-
-			# Create a new intel object
-			self.intel = Intel(self)
-
-			# The jar is empty, so start the parser, but return an empty dict
-			self.parseFiles()
-
-	# Try to get restore data previously put on the disk
-	def _unpickle(self):
-
-		wf.warn('Witty is unpickling data')
-
-		data = {}
-
-		# Load in existing completions previously stored
-		try:
-			pickleFile = open(self.pickleFileName, 'rb')
-			try:
-				data = pickle.load(pickleFile)
-				pickleFile.close()
-			except EOFError:
-				print('Unable to unpickle')
-		except FileNotFoundError:
-			pass
-
-		return data
-
-	## Get the scope from a specific file
-	def getScope(self, filename, scopename):
-		return self.intel.getScope(filename, scopename)
-
-
-
-# The Witty entrance
-class WittyCommand(sublime_plugin.EventListener):
-
-	_parser_thread = None
-
-	def __init__(self):
-
-		self.allProjects = {}
-
-		for window in sublime.windows():
-			newProject = WittyProject(window.folders())
-			print('New project created')
-			self.allProjects[newProject.id] = newProject
-	
-	# Get the project ID based on the view
-	def getProjectId(self, view):
-		projectFolders = view.window().folders()
-		return wf.generateHash(projectFolders)
-
-	# Get the project
-	def getProject(self, view):
-		projectId = self.getProjectId(view)
-
-		if projectId in self.allProjects:
-			return self.allProjects[projectId]
-		else:
-			return False
-
-
-	# After saving a file, reparse it
-	def on_post_save_async(self, view):
-		
-		savedFileName = view.file_name()
-
-		if savedFileName.count('Witty.py'):
-			return False
-
-		# Get the project
-		project = self.getProject(view)
-
-		if project:
-			project.parseFiles(savedFileName)
-
-	# Query completions
-	def on_query_completions(self, view, prefix, locations):
-
-		project = self.getProject(view)
-
-		#if project:
-		#	return project.queryForCompletions(view, prefix, locations)
-		
-		#return
-
 		current_file = view.file_name()
-
 
 		# Get the region
 		region = view.sel()[0]
@@ -1185,70 +1139,129 @@ class WittyCommand(sublime_plugin.EventListener):
 		# Get the better prefix
 		brefix = wf.getBetterPrefix(left_line)
 
-		scope = project.getScope(current_file, function_scope)
+		scope = self.getScope(current_file, function_scope)
 
-		if not scope:
-			return
+		if scope:
+			completions = []
 
-		completions = []
+			variables = scope.getAllVariables()
 
-		variables = scope.getAllVariables()
+			for varname, varinfo in variables.items():
+				pr(varinfo.__dict__)
+				completions.append((varname, varname))
 
-		for varname, varinfo in variables.items():
-			completions.append((varname, varname))
+			# INHIBIT_WORD_COMPLETIONS = 8 = Only show these completions
+			# INHIBIT_EXPLICIT_COMPLETIONS = 16 = ?
+			return (completions, sublime.INHIBIT_WORD_COMPLETIONS)
+		else:
 
-		# try:
-		# 	scopes = allCompletions[current_file]
-		# except KeyError:
-		# 	print('Key not found: ' + current_file)
-		# 	return
+			info('Scope "' + function_scope + '" in file ' + current_file + ' was not found')
+
+			if wittyOnly:
+				# We only want witty results, so make sure sublime doesn't interfere
+				return ([], sublime.INHIBIT_WORD_COMPLETIONS)
+			else:
+				# Let sublime do what it wants
+				return
+
+
+
+	# Initially set the data by restoring or parsing
+	def _initIntel(self):
+
+		# Try to restore the data
+		jar = self._unpickle()
+
+		# If the jar is not empty, return the data
+		if jar and len(jar.files):
+			self.intel = jar
+		else:
+
+			# Create a new intel object
+			self.intel = Intel(self)
+
+			# The jar is empty, so start the parser, but return an empty dict
+			self.parseFiles()
+
+	# Try to get restore data previously put on the disk
+	def _unpickle(self):
+
+		info('Unpickling project ' + str(self.id) + ' data')
+
+		data = {}
+
+		# Load in existing completions previously stored
+		try:
+			pickleFile = open(self.pickleFileName, 'rb')
+			try:
+				data = pickle.load(pickleFile)
+				pickleFile.close()
+			except EOFError:
+				warn('Unable to unpickle')
+		except FileNotFoundError:
+			pass
+
+		return data
+
+	## Get the scope from a specific file
+	def getScope(self, filename, scopename):
+		pr('Looking for scope "' + scopename + '" in file ' + filename)
+		return self.intel.getScope(filename, scopename)
+
+
+
+# The Witty entrance
+class WittyCommand(sublime_plugin.EventListener):
+
+	_parser_thread = None
+
+	def __init__(self):
+
+		self.allProjects = {}
+
+		for window in sublime.windows():
+			newProject = WittyProject(window.folders())
+			self.allProjects[newProject.id] = newProject
+
+			info('\n\n', False)
+			info('New project created (' + str(newProject.id) + ')')
+	
+	# Get the project ID based on the view
+	def getProjectId(self, view):
+		projectFolders = view.window().folders()
+		return wf.generateHash(projectFolders)
+
+	# Get the project
+	def getProject(self, view):
+		projectId = self.getProjectId(view)
+
+		if projectId in self.allProjects:
+			return self.allProjects[projectId]
+		else:
+			return False
+
+
+	# After saving a file, reparse it
+	def on_post_save_async(self, view):
 		
-		# # Default to the first scope
-		# found_scope = scopes[1]
+		savedFileName = view.file_name()
 
-		# for s in scopes:
-		# 	if s['name'] == function_scope:
-		# 		found_scope = s
-		# 		break;
+		if savedFileName.count('Witty.py'):
+			return False
 
-		# hierarchy = [found_scope]
-		# workingScope = found_scope
+		# Get the project
+		project = self.getProject(view)
 
-		# # Determine the level of this scope
-		# while workingScope['parent']:
-		# 	workingScope = scopes[workingScope['parent']]
-		# 	hierarchy.insert(0, workingScope)
+		if project:
+			project.parseFiles(savedFileName)
 
-		# #print('>>> found scope:')
-		# #print(function_scope)
+	# Query completions
+	def on_query_completions(self, view, prefix, locations):
 
-		# completions = []
-		# temp = []
-		
-		# for s in hierarchy:
+		project = self.getProject(view)
 
-		# 	if not len(s['variables']):
-		# 		continue
-
-		# 	# First order the variables
-		# 	myvars = []
-		# 	keys = list(s['variables'].keys())
-		# 	keys.sort()
-
-		# 	#print(keys)
-
-		# 	for k in keys:
-		# 		myvars.append(s['variables'][k])
-
-		# 	# Then add them to the autocomplete list
-		# 	for v in myvars:
-		# 		completions.insert(0, (v['name'] + '\t' + v['type'], v['name']))
-
-		# sublime.status_message('Auto completing "' + brefix + '"')
-
-		# INHIBIT_WORD_COMPLETIONS = 8 = Only show these completions
-		# INHIBIT_EXPLICIT_COMPLETIONS = 16 = ?
-		return (completions, sublime.INHIBIT_WORD_COMPLETIONS)
+		if project:
+			return project.queryForCompletions(view, prefix, locations)
 	
 class WittyReindexProjectCommand(sublime_plugin.ApplicationCommand):
 

@@ -2,8 +2,18 @@
 # These functions are used throughout the Witty plugin,
 # and are mainly for getting information out of code
 #
-import os, re, threading, pprint, json, pickle, hashlib
-test = 'hi'
+import os, re, threading, pprint, json, pickle, hashlib, inspect, sublime
+
+doDebug = False
+
+# For development purposes
+settings = sublime.load_settings("Preferences.sublime-settings")
+
+if settings.get('env') == 'dev':
+	doDebug = True
+
+debugLevel = settings.get('wittylevel')
+
 #
 # Regexes
 #
@@ -32,9 +42,16 @@ reFnCallBegin = re.compile('^\s*(?!\s)[\w\.\[\]]*\w\(', re.M)
 # Get assignment variable names
 reANames = re.compile('(\S*?)\s*\=(?!\=)', re.M)
 
+# Get declaration pairs
+reDeclarations = re.compile('(?= |\,)(\w+)\s*={0,1}\s*.*?(?=,|$)', re.M)
+
+# This works in regexr, but not in python ((?=^| |\,|\,\s+)(\w+)\s*\={0,1}.*?(?=,|$))
+
+reDeclarations = re.compile(r'((?=^| |\,|\,\s+)(\w+)\s*\={0,1}.*?(?=,|$))', re.M)
+
 # Find strings (even with escaped ' and ")
 # Regex is actually (?<!\\)(?:(')|")(?(1)(\\'|[^'\r])+?'|(\\"|[^\r"])+?")
-reStrings = re.compile(r'''(?<!\\)(?:(')|")(?(1)(\\'|[^'\r])+?'|(\\"|[^\r"])+?")''', re.M)
+reStrings = re.compile(r'''(?<!\\)(?:(')|")(?(1)(\\'|[^'\r])+?'|(\\"|[^\r"])+?")''', re.M|re.X)
 
 # Valid javascript variable name regex,
 # this does not include unicode stuff
@@ -112,13 +129,71 @@ def log(data, filename='workfile', doDictify=False):
 	except AttributeError:
 		openFiles[filename].write('\n' + pp.pformat(data))
 
-# Print out a warning to the console
-def warn(message):
-	print(message)
+def color(t, c):
+	
+	# For sublime just use 'esc' to stand out
+	return t + chr(0x1b) + ' '
 
-# Debug function
-def pr(message):
-	print(message)
+	# For terminal
+	#return chr(0x1b)+"["+str(c)+"m"+t+chr(0x1b)+"[0m"
+
+## Echo something to the console
+#  @param   message      The message to print
+#  @param   stackLevel   How many functions to skip
+def echo(message, showStack = True, stackLevel = 1):
+
+	if showStack:
+
+		# Get the current frame
+		frame = inspect.currentframe()
+
+		# Get the outer frame
+		outer = inspect.getouterframes(frame)
+
+		# The second element is the calling frame
+		caller = outer[stackLevel]
+
+		# Split out the filename
+		fileName = caller[1].rsplit('/')
+		fileName = fileName[len(fileName)-1]
+
+		# Get the line number
+		lineNr = caller[2]
+
+		# Get the caller function name
+		callerName = caller[3]
+
+		# Add some color to the stack info
+		stackinfo = color('[' + fileName + ':' + str(lineNr) + ' ' + callerName + '] ', 1)
+
+		# And print it out
+		print(stackinfo + str(message))
+	else:
+		print(message)
+
+## Print out a warning to the console (level 1)
+#  @param   message      The message to print
+def warn(message, showStack = True, stackLevel = 2):
+
+	# If debugLevel is zero, nothing should be shown
+	if debugLevel > 0:
+		echo(message, showStack, stackLevel)
+
+## Print out info to the console (level 2)
+#  @param   message      The message to print
+def info(message, showStack = True, stackLevel = 2):
+
+	# Only print if debugLevel is higher than 1
+	if debugLevel > 1:
+		echo(message, showStack, stackLevel)
+
+## Print out debug message to the console (level 3)
+#  @param   message      The message to print
+def pr(message, showStack = True, stackLevel = 2):
+
+	# Only print if debugLevel is higher than 2
+	if debugLevel > 2:
+		echo(message, showStack, stackLevel)
 
 #
 # String manipulators / searchers
