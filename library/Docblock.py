@@ -46,6 +46,14 @@ class Docblock:
 		
 		return []
 
+	# Parse a simple attribute
+	def parseAttribute(self, text):
+
+		# Remove all double whitespaces
+		text = re.sub('\s+', ' ', text)
+
+		return text
+
 	# Parse param/property information
 	def parseParam(self, text):
 		result = {'type': '', 'name': '', 'description': ''}
@@ -99,6 +107,20 @@ class Docblock:
 					result[temp['name']] = temp
 
 		return result
+
+	# Return a single property
+	def getAttribute(self, name):
+		
+		if not name in self.properties:
+			return None
+		else:
+			return self.parseAttribute(self.properties[name])
+
+	# See if this property is present
+	def hasAttribute(self, name):
+		
+		if name in self.properties:
+			return True
 
 	# Get the @property properties
 	def getProperties(self):

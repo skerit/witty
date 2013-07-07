@@ -476,6 +476,14 @@ class WittyStatement:
 		#for pName, pValue in self.params.items():
 		#	thisScope['variables'].append(pName)
 
+	## Get a statement docblock attribute
+	def getAttribute(self, attributeName):
+		return self.docblock.getAttribute(attributeName)
+
+	## See if a docblock attribute is present
+	def hasAttribute(self, attributeName):
+		return self.docblock.hasAttribute(attributeName)
+
 
 class WittyParser(threading.Thread):
 
@@ -554,6 +562,9 @@ class Intel:
 		# Create the root scope
 		self.root = WittyRoot(self)
 
+		# All the types by name » variable
+		self.types = []
+
 		# Files
 		self.files = {}
 
@@ -625,28 +636,29 @@ class Intel:
 				# Get the statement's scope
 				statementScope = scopeMap[statement.scopeId]
 				statementScope.addVariable(statement)
-		
-		rv = self.root.variables
 
-		#testScope = self.getScope('/home/skerit/Projecten/witty-test-case/test.js', 'function(){')
-
-		#testvars = testScope.getAllVariables()
-
-		# for name, variable in testvars.items():
-		# 	print('Var: ' + name)
-		# 	print(variable.__dict__)
-		# 	print(variable.scope.name)
-
-		#test = self.getScope('/home/skerit/Projecten/alchemy-skeleton/node_modules/alchemymvc/lib/class/model.js', 'var Model = global.Model = alchemy.classes.BaseClass.extend(function Model (){')
-		#print(test.getAllVariables())
+			self.registerTypes()
 
 
-		#for varId, variable in rv.items():
-			#print(str(variable.id) + ' == ' + variable.name)
-			#print(variable.statement.line)
-			#print(variable.statement.__dict__)
-			#pass
+	## Register all the types
+	#  @param   self        The object pointer
+	def registerTypes(self):
 
+		# Reset the types
+		self.types = []
+
+		# Register all the new types
+		for variable in self.variables:
+
+			if variable.statement.hasAttribute('typename'):
+
+				# Register them for every name given
+				for name in variable.statement.name:
+					# Only add not-already-existing types
+					if not name in self.types:
+						# @todo: apparently names like 'age) {' are still captured!
+						# That should be fixed (but not here)
+						self.types[name] = variable
 
 	## Add a WittyVariable to the given scope without making a fuss
 	#  @param   self        The object pointer
