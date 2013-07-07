@@ -6,13 +6,13 @@ import os, re, threading, pprint, json, pickle, hashlib, inspect, sublime
 
 doDebug = False
 
-# For development purposes
-settings = sublime.load_settings("Preferences.sublime-settings")
+# Is something an array?
+def is_array(object):
+	return isinstance(object, (list, tuple))
 
-if settings.get('env') == 'dev':
-	doDebug = True
 
-debugLevel = settings.get('wittylevel')
+doDebug = False
+debugLevel = 1
 
 #
 # Regexes

@@ -1,6 +1,11 @@
 import re
 import Witty.library.functions as wf
 
+# Debug wrappers
+def warn(message, showStack = True): wf.warn(message, showStack, 3)
+def info(message, showStack = True): wf.info(message, showStack, 3)
+def pr(message, showStack = True): wf.pr(message, showStack, 3)
+
 #
 # The DocBlock class
 #
