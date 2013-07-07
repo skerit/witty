@@ -12,7 +12,7 @@
 var Person = function(firstname, age) {
 
 	this.firstname = firstname;
-
+	
 }
 
 var thisIsNotAGlobal = 10;
@@ -28,3 +28,6 @@ function(){
 
 	}
 }
+
+// These are multiple statements on one line
+var stest = ';;;';var we = 'are';var declaring = 'multiple';var statements = 'on one line';

@@ -44,7 +44,7 @@ class WittyFile:
 		self.createNewScope('root', 0)
 
 		# Empty the blocks
-		self.blocks = []
+		self.docblocks = []
 
 		self.root = {}
 
@@ -63,11 +63,11 @@ class WittyFile:
 		# Find all the docblocks in the original string
 		docblocks = wf.reBlocks.findall(self.original)
 
-		self.blocks = []
+		self.docblocks = []
 
 		if (docblocks):
 			for match_tupple in docblocks:
-				self.blocks.append(match_tupple[0])
+				self.docblocks.append(match_tupple[0])
 
 		# Remove all single line comments
 		self.working = re.sub(wf.reComment, '', self.original)
@@ -76,11 +76,11 @@ class WittyFile:
 		self.working = re.sub(wf.reBlocks, '//DOCBLOCK//', self.working)
 
 		# Recursively parse all the statements
-		statements = self.parseStatements(self.working, self.blocks)
+		statements = self.parseStatements(self.working, self.docblocks)
 
 		self.textStatements = statements
 
-		return self.blocks
+		return self.docblocks
 
 	# Create a new scope, return its ID
 	def createNewScope(self, name, parentScope, docBlock = ''):
@@ -98,48 +98,131 @@ class WittyFile:
 
 		return newId
 
+	## Turn text into an array of objects
+	def convertText(self, workingLines):
+
+		# Do nothing if it's already an array
+		if wf.is_array(workingLines):
+			if len(workingLines):
+				# If we're dealing with an array of strings
+				if isinstance(workingLines[0], str):
+					beginArray = workingLines
+				else:
+					return workingLines
+			else:
+				return workingLines
+		else:
+			beginArray = workingLines.split('\n')
+
+
+		resultArray = []
+
+		# Line numbers start at 1
+		originalLineCount = 1
+
+		# Our internal docblock starts at zero
+		docblockCount = 0
+
+		for line in beginArray:
+
+			# Our current line length is 1 line by default
+			# This is not the amount of characters in one line
+			# but some lines continue on other lines
+			currentLineLength = 1
+
+			# Skip empty lines
+			if line:
+
+				# Use the default newline adding
+				addDefaultNewline = True
+
+				newLine = {}
+				newLine['linenr'] = originalLineCount
+				newLine['text'] = False
+				newLine['docblock'] = False
+				
+				# Get the original line nr
+				if line == '//DOCBLOCK//':
+
+					docblock = self.docblocks[docblockCount]
+					newLine['docblock'] = docblock
+
+					currentLineLength += docblock.count('\n')
+
+					text = False
+
+					# Go to the next docblock for next iteration
+					docblockCount += 1
+				else:
+					text = line.strip()
+					stats = wf.splitStatements(text)
+
+					# If there is just one statement, add that
+					if len(stats) == 1:
+						newLine['text'] = text
+					else:
+						# If there is more than 1, or none...
+						
+						addDefaultNewline = False
+
+						for p in stats:
+							subLine = {}
+							subLine['linenr'] = originalLineCount
+							subLine['text'] = p
+							subLine['docblock'] = False
+							# @todo: this is true for every statement but the last, probably!
+							subLine['length'] = 1
+							resultArray.append(subLine)
+
+				newLine['linenr'] = originalLineCount
+				newLine['length'] = currentLineLength
+
+				# Append the new line object to the result array
+				if addDefaultNewline:
+					resultArray.append(newLine)
+
+			# Increate the original linecount
+			originalLineCount += currentLineLength
+
+		return resultArray
+
 	# Parsing statements begins here
 	def parseStatements(self, workingLines, docblocks, scopeId = 1, blockType = '', ignoreFirstNewBlock = False):
 
-		# Turn the text into an array of lines
-		if not wf.is_array(workingLines):
-			workingLines = workingLines.split('\n')
+		# Turn the text into an array of line objects
+		workingLines = self.convertText(workingLines)
+
+		pr(workingLines)
 
 		# Initial value: no statement is open
 		statementIsBusy = False
 
 		statements = []
 
-		dbcount = 0
 		dbnow = False
 
 		# The running statement
 		s = {}
 		w = ''
 
-		for line in workingLines:
+		for lineObject in workingLines:
 
-			strippedLine = line.strip()
-
-			# If the line is empty, continue to the next line
-			if len(strippedLine) == 0:
-				continue
+			strippedLine = lineObject['text']
 
 			# If it's a docblock, keep it for the next statement!
-			if strippedLine == '//DOCBLOCK//':
-				dbnow = docblocks[dbcount]
-				dbcount += 1
+			if lineObject['docblock']:
+				dbnow = lineObject['text']
 				continue
 
 			# Do we need to create a new statement or is one already busy?
 			if not statementIsBusy:
 				s = {'docblock': '', 'line': '', 'docblocks': [], 'multiline': False, 'scope': scopeId}
 				s['line'] = [strippedLine]
-				w = line
+				w = strippedLine
 			else:
 				s['multiline'] = True
 				s['line'].append(strippedLine)
-				w += ' ' + line
+				w += ' ' + strippedLine #originally line
 
 			# If the statement is not busy (this includes if a statement is BEGINNING, even if it doesn't end)
 			if dbnow:

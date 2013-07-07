@@ -13,6 +13,9 @@ def pr(message, showStack = True): wf.pr(message, showStack, 3)
 # All the open projects
 allProjects = {}
 
+# Parser threads by project
+parserThreads = {}
+
 class WittyProject:
 
 	# WittyProject Constructor
@@ -36,17 +39,15 @@ class WittyProject:
 	# Begin parsing files
 	def parseFiles(self, savedFileName = ''):
 
-		# @todo: the thread can't be stored in this instance,
-		# because that breaks pickling
-		# Maybe store in an outside global?
-
 		# If a thread is already running: stop it
-		#if self._parserThread:
-		#	self.__parserThread.stop()
+		if self.id in parserThreads and parserThreads[self.id]:
+			print('Killing running thread')
+			parserThreads[self.id]._stop()
+
 		info('Start parsing "' + savedFileName + '"')
 
-		_parserThread = WittyParser(self, savedFileName)
-		_parserThread.start()
+		parserThreads[self.id] = WittyParser(self, savedFileName)
+		parserThreads[self.id].start()
 
 	# Is data already available for this file?
 	def hasFileData(self, fileName):

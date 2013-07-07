@@ -245,3 +245,61 @@ def getBetterPrefix(text):
 			pass
 
 	return text
+
+## Split a line containing multiple statements
+#  @param   text   The line to split
+def splitStatements(text):
+
+	# The previous character
+	prev = ''
+
+	# The working piece
+	working = ''
+
+	results = []
+	stringOpen = False
+	backslash = False
+
+	for i, c in enumerate(text):
+
+		# If c is a backslash, invert the backslash status
+		if c == "\\":
+			backslash = not backslash
+
+		# If a string is open
+		if stringOpen:
+
+			# Add the current char no matter what
+			working = working + c
+
+			# And the new char is the same literal,
+			# and it wasn't backslash-escaped
+			if c == stringOpen and not backslash:
+				stringOpen = False
+		else:
+
+			working = working + c
+
+			if c == ';':
+				results.append(working)
+				working = ''
+			elif c == '"':
+				stringOpen = '"'
+			elif c == "'":
+				stringOpen = "'"
+
+		# If c is not a backslash, the backslash status for
+		# the next iteration is false again
+		if not c == "\\":
+			backslash = False
+
+		# Set prev for next iteration
+		prev = c
+
+	# Don't forget to add the last working line!
+	if working:
+		results.append(working)
+
+	return results
+
+

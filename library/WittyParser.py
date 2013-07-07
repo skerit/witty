@@ -8,12 +8,34 @@ def warn(message, showStack = True): wf.warn(message, showStack, 3)
 def info(message, showStack = True): wf.info(message, showStack, 3)
 def pr(message, showStack = True): wf.pr(message, showStack, 3)
 
+#
+# WittyParser has to take the original text files
+# and convert them to something we can use later on
+#
 class WittyParser(threading.Thread):
 
-	def __init__(self, project, originFile): # collector, origin_file, open_folder_arr, timeout_seconds, globalCompletions):
+	def __init__(self, project, originFile):
 		self.project = project
 		self.originFile = originFile
 		threading.Thread.__init__(self)
+
+	# Function that begins the thread
+	def run(self):
+		
+		# Loop through every folder in the project
+		for folder in self.project.folders:
+			# Get all the javascript files in the project
+			jsFiles = self.getJavascriptFiles(folder)
+			for fileName in jsFiles:
+				self.startFileParse(fileName)
+
+		sublime.status_message('Witty has finished parsing')
+
+		# Fire the postParse function
+		self.project.intel.postParse()
+
+		# Store the data on disk
+		self.project.storeOnDisk()
 
 	# Get all javascript files (ending with .js, not containing .min.)
 	def getJavascriptFiles(self, dir_name, *args):
@@ -56,21 +78,3 @@ class WittyParser(threading.Thread):
 			# If we got a new WittyFile instance, store it in the project
 			if fileResult:
 				self.project.intel.files[fileName] = fileResult
-
-	# Function that begins the thread
-	def run(self):
-		
-		# Loop through every folder in the project
-		for folder in self.project.folders:
-			# Get all the javascript files in the project
-			jsFiles = self.getJavascriptFiles(folder)
-			for fileName in jsFiles:
-				self.startFileParse(fileName)
-
-		sublime.status_message('Witty has finished parsing')
-
-		# Fire the postParse function
-		self.project.intel.postParse()
-
-		# Store the data on disk
-		self.project.storeOnDisk()
