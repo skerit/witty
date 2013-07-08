@@ -31,3 +31,10 @@ function(){
 
 // These are multiple statements on one line
 var stest = ';;;';var we = 'are';var declaring = 'multiple';var statements = 'on one line';
+
+// An object
+var simpleObject = {
+	key: 'test',
+	second: 'value'
+}
+

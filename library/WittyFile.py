@@ -99,6 +99,8 @@ class WittyFile:
 		return newId
 
 	## Turn text into an array of objects
+	#  @param   self          The object pointer
+	#  @param   workingLines
 	def convertText(self, workingLines):
 
 		# Do nothing if it's already an array

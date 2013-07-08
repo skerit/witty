@@ -41,8 +41,8 @@ import Witty.library.functions as wf
 # Witty only completions?
 wittyOnly = settings.get('wittyonly')
 
-# Set the debug level
-wf.debugLevel = settings.get('wittylevel')
+# Set the debug level, default to 0
+wf.debugLevel = settings.get('wittylevel') or 0
 wf.doDebug = doDebug
 
 # Debug wrappers

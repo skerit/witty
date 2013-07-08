@@ -71,7 +71,7 @@ class WittyProject:
 
 	# Query for completions
 	def queryForCompletions(self, view, prefix, locations):
-
+		
 		currentFileName = view.file_name()
 
 		if not wf.isJavascriptFile(currentFileName):
