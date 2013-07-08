@@ -35,6 +35,9 @@ class WittyFile:
 		self.textStatements = []
 		self.statements = []
 
+		# Empty the blocks
+		self.docblocks = []
+
 		# Create the scopes
 		self.scopes = []
 		self.scopeDocBlocks = {}
@@ -43,13 +46,9 @@ class WittyFile:
 		self.createNewScope('global', False)
 		self.createNewScope('root', 0)
 
-		# Empty the blocks
-		self.docblocks = []
-
 		self.root = {}
 
-		# Parse the file
-		self.parseFile()
+		self.parse()
 
 		# Begin the second stage
 		self.secondStage()
@@ -57,64 +56,107 @@ class WittyFile:
 		wf.log(self.scopes, 'scopes')
 		wf.log({fileName: self.textStatements, 'scopes': self.scopes})
 
-	# Begin parsing this file
-	def parseFile(self):
+	## Start parsing the file
+	def parse(self):
 
-		# Find all the docblocks in the original string
-		docblocks = wf.reBlocks.findall(self.original)
-
-		self.docblocks = []
-
-		if (docblocks):
-			for match_tupple in docblocks:
-				self.docblocks.append(match_tupple[0])
-
-		# Remove all single line comments
-		self.working = re.sub(wf.reComment, '', self.original)
-
-		# Replace all the existing docblocks with a placeholder for easy parsing
-		self.working = re.sub(wf.reBlocks, '//DOCBLOCK//', self.working)
+		# Extract the docblocks
+		(self.working, self.docblocks) = wf.extractDocblocks(self.original)
 
 		# Recursively parse all the statements
-		statements = self.parseStatements(self.working, self.docblocks)
+		self.textStatements = self.parseStatements(self.original, self.docblocks)
 
-		self.textStatements = statements
+	# Parsing statements begins here
+	def parseStatements(self, workingLines, docblocks, scopeId = 1, blockType = '', ignoreFirstNewBlock = False):
 
-		return self.docblocks
+		# Turn the text into an array of line objects
+		workingLines = self.convertText(workingLines)
 
-	# Create a new scope, return its ID
-	def createNewScope(self, name, parentScope, docBlock = ''):
-		newId = len(self.scopes)
-		self.scopes.append({'id': newId, 'name': name, 'parent': parentScope, 'variables': {}, 'level': 0})
+		#pr(workingLines)
 
-		self.scopeDocBlocks[newId] = docBlock
+		# Initial value: no statement is open
+		statementIsBusy = False
 
-		workingScope = self.scopes[newId]
+		statements = []
 
-		# Determine the level of this scope
-		while workingScope['parent']:
-			self.scopes[newId]['level'] += 1
-			workingScope = self.scopes[workingScope['parent']]
+		dbnow = False
 
-		return newId
+		# The running statement
+		s = {}
+		w = ''
+
+		for lineObject in workingLines:
+
+			strippedLine = lineObject['text']
+
+			# If it's a docblock, keep it for the next statement!
+			if lineObject['docblock']:
+				dbnow = lineObject['text']
+				continue
+
+			# Do we need to create a new statement or is one already busy?
+			if not statementIsBusy:
+				s = {'docblock': '', 'line': '', 'docblocks': [], 'multiline': False, 'scope': scopeId}
+				s['line'] = [strippedLine]
+				w = strippedLine
+			else:
+				s['multiline'] = True
+				s['line'].append(strippedLine)
+				w += ' ' + strippedLine #originally line
+
+			# If the statement is not busy (this includes if a statement is BEGINNING, even if it doesn't end)
+			if dbnow:
+				if not statementIsBusy:
+					s['docblock'] = dbnow
+				else:
+					s['docblocks'].append(dbnow)
+
+				# Reset the dbnow
+				dbnow = False
+
+			# Now see if the statement is finished
+			oBracket = w.count('{')
+			cBracket = w.count('}')
+
+			if not ignoreFirstNewBlock and oBracket > cBracket:
+				statementIsBusy = True
+			else:
+				statementIsBusy = False
+				statements.append(s)
+				ignoreFirstNewBlock = False
+
+		results = []
+		previousStatement = None
+
+		for stat in statements:
+			newStat = self.parseStat(stat, scopeId, previousStatement, blockType, ignoreFirstNewBlock)
+			results.append(newStat)
+
+			# Store this new statement as the previous statement,
+			# so we can pass it on next time
+			previousStatement = newStat
+
+		return statements
 
 	## Turn text into an array of objects
 	#  @param   self          The object pointer
 	#  @param   workingLines
 	def convertText(self, workingLines):
 
-		# Do nothing if it's already an array
-		if wf.is_array(workingLines):
-			if len(workingLines):
-				# If we're dealing with an array of strings
-				if isinstance(workingLines[0], str):
-					beginArray = workingLines
-				else:
-					return workingLines
-			else:
-				return workingLines
-		else:
-			beginArray = workingLines.split('\n')
+		# # Do nothing if it's already an array
+		# if wf.is_array(workingLines):
+		# 	if len(workingLines):
+		# 		# If we're dealing with an array of strings
+		# 		if isinstance(workingLines[0], str):
+		# 			beginArray = workingLines
+		# 		else:
+		# 			return workingLines
+		# 	else:
+		# 		return workingLines
+		# else:
+		# 	beginArray = workingLines.split('\n')
+
+		beginArray = wf.splitStatements(workingLines)
+		return
 
 
 		resultArray = []
@@ -188,78 +230,6 @@ class WittyFile:
 
 		return resultArray
 
-	# Parsing statements begins here
-	def parseStatements(self, workingLines, docblocks, scopeId = 1, blockType = '', ignoreFirstNewBlock = False):
-
-		# Turn the text into an array of line objects
-		workingLines = self.convertText(workingLines)
-
-		pr(workingLines)
-
-		# Initial value: no statement is open
-		statementIsBusy = False
-
-		statements = []
-
-		dbnow = False
-
-		# The running statement
-		s = {}
-		w = ''
-
-		for lineObject in workingLines:
-
-			strippedLine = lineObject['text']
-
-			# If it's a docblock, keep it for the next statement!
-			if lineObject['docblock']:
-				dbnow = lineObject['text']
-				continue
-
-			# Do we need to create a new statement or is one already busy?
-			if not statementIsBusy:
-				s = {'docblock': '', 'line': '', 'docblocks': [], 'multiline': False, 'scope': scopeId}
-				s['line'] = [strippedLine]
-				w = strippedLine
-			else:
-				s['multiline'] = True
-				s['line'].append(strippedLine)
-				w += ' ' + strippedLine #originally line
-
-			# If the statement is not busy (this includes if a statement is BEGINNING, even if it doesn't end)
-			if dbnow:
-				if not statementIsBusy:
-					s['docblock'] = dbnow
-				else:
-					s['docblocks'].append(dbnow)
-
-				# Reset the dbnow
-				dbnow = False
-
-			# Now see if the statement is finished
-			oBracket = w.count('{')
-			cBracket = w.count('}')
-
-			if not ignoreFirstNewBlock and oBracket > cBracket:
-				statementIsBusy = True
-			else:
-				statementIsBusy = False
-				statements.append(s)
-				ignoreFirstNewBlock = False
-
-		results = []
-		previousStatement = None
-
-		for stat in statements:
-			newStat = self.parseStat(stat, scopeId, previousStatement, blockType, ignoreFirstNewBlock)
-			results.append(newStat)
-
-			# Store this new statement as the previous statement,
-			# so we can pass it on next time
-			previousStatement = newStat
-
-		return statements
-
 	## Find some additional information on a single line
 	#  @param   self                The object pointer
 	#  @param   statement           A primitive statement object
@@ -324,6 +294,22 @@ class WittyFile:
 
 			for pName, pValue in params.items():
 				scope['variables'][pName] = pValue
+
+	# Create a new scope, return its ID
+	def createNewScope(self, name, parentScope, docBlock = ''):
+		newId = len(self.scopes)
+		self.scopes.append({'id': newId, 'name': name, 'parent': parentScope, 'variables': {}, 'level': 0})
+
+		self.scopeDocBlocks[newId] = docBlock
+
+		workingScope = self.scopes[newId]
+
+		# Determine the level of this scope
+		while workingScope['parent']:
+			self.scopes[newId]['level'] += 1
+			workingScope = self.scopes[workingScope['parent']]
+
+		return newId
 
 	def recurseStatObj(self, statements, parentStatement = False):
 		for stat in statements:

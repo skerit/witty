@@ -33,8 +33,11 @@ function(){
 var stest = ';;;';var we = 'are';var declaring = 'multiple';var statements = 'on one line';
 
 // An object
-var simpleObject = {
+var simpleObject = {wrongly: 'placed',
 	key: 'test',
 	second: 'value'
 }
 
+explicit = 'test';
+
+anotherObject = {};

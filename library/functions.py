@@ -246,6 +246,29 @@ def getBetterPrefix(text):
 
 	return text
 
+## Remove docblocks from the code and return them in an array
+#  @param   text         The original code
+#  @returns text,array   Tuple: modified text and docblock array
+def extractDocblocks(text):
+
+	# Find all the docblocks in the original string
+	docblocks = reBlocks.findall(text)
+
+	resultArray = []
+	resultText = ''
+
+	if (docblocks):
+		for match_tupple in docblocks:
+			resultArray.append(match_tupple[0])
+
+	# Remove all single line comments
+	resultText = re.sub(reComment, '', text)
+
+	# Replace all the existing docblocks with a placeholder for easy parsing
+	resultText = re.sub(reBlocks, '//DOCBLOCK//', resultText)
+
+	return resultText, resultArray
+
 ## Split a line containing multiple statements
 #  @param   text   The line to split
 def splitStatements(text):
@@ -253,14 +276,31 @@ def splitStatements(text):
 	# The previous character
 	prev = ''
 
+	# The next character
+	next = ''
+
 	# The working piece
 	working = ''
 
+	# The line number
+	lineNr = 1
+	beginLineNr = 1
+
 	results = []
 	stringOpen = False
+	docblockOpen = False
+	inlineCommentOpen = False
 	backslash = False
+	length = len(text)
+	append = False
+	lineType = False
 
 	for i, c in enumerate(text):
+
+		if i+1 < length:
+			next = text[i+1]
+		else:
+			next = ''
 
 		# If c is a backslash, invert the backslash status
 		if c == "\\":
@@ -276,17 +316,73 @@ def splitStatements(text):
 			# and it wasn't backslash-escaped
 			if c == stringOpen and not backslash:
 				stringOpen = False
+		elif docblockOpen:
+			
+			working = working + c
+
+			# /*/ is not a docblock, it has to be longer!
+			if len(working) > 3 and prev == "*" and c == "/":
+				append = working
+				lineType = 'docblock'
+				working = ''
+				docblockOpen = False
+		elif inlineCommentOpen:
+			# We just remove/dont add inline comments
+			if c == "\n":
+				inlineCommentOpen = False
+		elif c == "/" and next == "*": # Docblock
+			docblockOpen = True
+			beginLineNr = lineNr
+
+			if working.strip():
+				append = working
+			
+			working = c
+		elif c == "/" and next == "/": # Inline comment, we just remove these
+			inlineCommentOpen = True
+			beginLineNr = lineNr
+
+			if working.strip():
+				append = working
+
+			working = ''
 		else:
 
 			working = working + c
 
 			if c == ';':
-				results.append(working)
+				append = working
 				working = ''
+
+				if prev == '}':
+					append = False
+			if c == '{':
+				append = working
+				lineType = 'openblock'
+				working = ''
+			if c == '}':
+				append = working
+				lineType = 'closeblock'
+				working = ''
+
+				if next == ';':
+					append += ';'
+
 			elif c == '"':
 				stringOpen = '"'
 			elif c == "'":
 				stringOpen = "'"
+
+		# If the append is set, append it
+		if append and append.strip():
+			if beginLineNr:
+				nr = beginLineNr
+			else:
+				nr = lineNr
+			results.append({'text': append.strip(), 'line': nr, 'type': lineType})
+			append = False
+			lineType = False
+			beginLineNr = False
 
 		# If c is not a backslash, the backslash status for
 		# the next iteration is false again
@@ -296,10 +392,24 @@ def splitStatements(text):
 		# Set prev for next iteration
 		prev = c
 
+		# If c is a return, increase the linenr
+		if c == "\n":
+			lineNr += 1
+
+
 	# Don't forget to add the last working line!
-	if working:
-		results.append(working)
+	if working.strip():
+		results.append({'text': working.strip(), 'line': lineNr, 'type': lineType})
+
+	for l in results:
+		pr(l)
 
 	return results
 
+class Statement():
 
+	def __init__(self):
+		pass
+
+def createStatements(lineArray):
+	pass
