@@ -272,10 +272,10 @@ def extractDocblocks(text):
 ## Get the characters before, and after the id
 #  @param   text   The text
 #  @param   id     The current id
-def getSurround(text, id):
+def getSurround(text, id, default = ''):
 
-	previous = ''
-	next = ''
+	previous = default
+	next = default
 
 	length = len(text)
 
@@ -288,6 +288,15 @@ def getSurround(text, id):
 		next = text[id+1]
 
 	return previous, next
+
+# Chars
+whitespace = [' ', '\n', '\t']
+
+# All the operators
+operators = ['+', '=', '-', '*', '/', '%', '<', '>', '~']
+
+# Things that denote expressions
+expressionizers = ['+', '=', '-', '*', '/', '%', '<', '>', '~', '(', ',']
 
 ## Find a text before
 #  @param   text   The text
@@ -312,9 +321,47 @@ def hasWordBefore(text, id, word):
 		else:
 			return False
 
-## Split a line containing multiple statements
+## Find a character before
+def hasCharBefore(text, id, char, ignore = [], ignoreWhitespace = True):
+
+	# If a single char is given, turn it into an array
+	if isinstance(char, str):
+		char = [char]
+
+	piece = text[:id]
+
+	# Make sure it's actually a word, not part of something else
+	maxPieceId = len(piece)-1
+
+	# Get the char before the word
+	before = piece[maxPieceId]
+
+	# If the char before is a whitespace...
+	if before in whitespace:
+		return hasCharBefore(piece, id-1, char, ignoreWhitespace)
+	elif before in char:
+		return True
+	else:
+		return False
+
+## Check if id is an opening array literal
+def isArrayLiteral(text, id):
+
+	char = text[id]
+
+	if char == '[':
+		return hasCharBefore(text, id, ['+', '=', '-', '*', '/', '%', '<', '>', '~', '(', ',', ';'])
+	else:
+		return False
+
+
+## Split a block (including a complete text file)
+#  into multiple statements
 #  @param   text   The line to split
 def splitStatements(text):
+
+	# Where all the result statements go
+	results = []
 
 	# The previous character
 	prev = ''
@@ -322,7 +369,7 @@ def splitStatements(text):
 	# The next character
 	next = ''
 
-	# The working piece
+	# The working statement
 	working = ''
 
 	# Debug info
@@ -332,14 +379,19 @@ def splitStatements(text):
 	lineNr = 1
 	beginLineNr = 1
 
-	results = []
+	# The length of the original text
+	length = len(text)
+
+	# Loop variables
+	append = False
+	lineType = False
+
+	# What is currently open?
 	stringOpen = False
 	docblockOpen = False
 	inlineCommentOpen = False
 	backslash = False
-	length = len(text)
-	append = False
-	lineType = False
+	
 	lettersBefore = False
 	colonBefore = False
 	parenBefore = False
@@ -350,6 +402,8 @@ def splitStatements(text):
 	functionParameters = False
 	inParamParens = 0
 	functionBody = False
+	closingBody = False
+	openArray = 0
 
 	# Count the number of open object literals
 	openObject = 0
@@ -421,7 +475,11 @@ def splitStatements(text):
 				if openObject == 0:
 					append = working
 					working = ''
-
+			elif c == '[':
+				if isArrayLiteral(text, i):
+					openArray += 1
+			elif c == ']' and openArray:
+				openArray -= 1
 			elif c == '{':
 				append = working
 				lineType = 'openblock'
@@ -480,6 +538,7 @@ def splitStatements(text):
 			if hasFunction and functionBody and openObject == 0 and c == '}':
 				functionBody = False
 				hasFunction = False
+				closingBody = True
 
 			# Look for parameters
 			if not functionParameters and hasFunction and c == '(':
@@ -523,10 +582,20 @@ def splitStatements(text):
 			else:
 				commaBefore = False
 
-			# If a newline begins see if it's the end of this statement
-			if c == '\n' and not docblockOpen and not openObject and not commaBefore and not closeParenBefore:
+			# If we're closing a block body
+			if closingBody and not next == ')' and not next == ';':
 				append = working
 				working = ''
+				closingBody = False
+			# If a newline begins see if it's the end of this statement
+			elif c == '\n' and (not functionBody and not openArray and not docblockOpen and not openObject and not commaBefore and not closeParenBefore):
+
+				# See if there is an expressionizer
+				if hasCharBefore(text, i, expressionizers):
+					pass
+				else:
+					append = working
+					working = ''
 
 		# If the append is set, append it
 		if append and append.strip():
@@ -534,7 +603,10 @@ def splitStatements(text):
 				nr = beginLineNr
 			else:
 				nr = lineNr
-			results.append({'text': append.strip(), 'line': nr, 'type': lineType})
+
+			newEntry = {'text': append.strip(), 'line': nr, 'type': lineType}
+			results.append(newEntry)
+
 			append = False
 			lineType = False
 			beginLineNr = False
@@ -549,15 +621,105 @@ def splitStatements(text):
 	if working.strip():
 		results.append({'text': working.strip(), 'line': lineNr, 'type': lineType})
 
-	for l in results:
-		pr(l)
+	postNormalize(results)
 
 	return results
 
-class Statement():
+## Does this line declare something by using var?
+def hasDeclaration(text):
 
-	def __init__(self):
-		pass
+	if text.beginswith('var '):
+		return True
+	else:
+		return False
 
-def createStatements(lineArray):
+## Get declaration variables
+def getAssignmentVariables(text):
 	pass
+
+## We've split & joined the statements
+#  to the best of our abilities,
+#  now we need to normalize them some more
+def postNormalize(inputArray, recurse = False):
+
+	#if recurse:
+	#	print(inputArray)
+
+	# The results to return in the end
+	results = []
+
+	# The current group
+	group = []
+
+	# The current docblock
+	activeDocblock = False
+
+	# Are we in an open block?
+	openBlock = 0
+	openBlockBegin = False
+	recurseResult = []
+
+	# Default surround object
+	default = {'text': '', 'line': False, 'type': False}
+
+	for id, entry in enumerate(inputArray):
+
+		(prev, next) = getSurround(inputArray, id, default)
+
+		# Set the docblock if present
+		if entry['type'] == 'docblock':
+			next['docblock'] = entry['text']
+			continue
+		else:
+			next['docblock'] = False
+
+		# If the current entry opens a new block
+		if entry['type'] == 'openblock':
+			openBlock += 1
+
+			if openBlock == 1:
+				openBlockBegin = entry
+
+		# If the previous entry opened a block, reset the group
+		if prev['type'] == 'openblock':
+			if openBlock == 1:
+				if not entry['type'] == 'closeblock':
+					group = []
+
+		if entry['type'] == 'closeblock':
+			if openBlock > 0:
+				openBlock -= 1
+
+		# Add the current entry to the group
+		group.append(entry)
+
+		if openBlock == 1 and next['type'] == 'closeblock':
+			if recurse:
+				print('>> ' + str(next))
+			if not recurse:
+				print(next)
+
+			# If the next statement will close this block...
+			# Recursively add body statements to this one
+			openBlockBegin['body'] = postNormalize(group, True)
+
+			# Reset the group with the beginning line of the block
+			group = [openBlockBegin]
+			openBlockBegin = False
+
+		if not entry['type'] and not openBlock:
+			results.append(group)
+			group = []
+		elif not openBlock and entry['type'] == 'closeblock':
+			results.append(group)
+			group = []
+
+	if not recurse:
+		for x in results:
+			pass
+			print(x)
+
+	return results
+
+
+

@@ -15,7 +15,8 @@
  *
  * @property {string}   firstname   The name of this person
  */
-var Person =function(firstname, age, data) {
+var Person =
+function(firstname, age, data) {
 
 	this.firstname = firstname
 	
@@ -31,6 +32,10 @@ function(){
 	var andWontBeVisibleOutsideThisFunction = true
 
 	var bb = function bla(){
+
+		var deeper = function underground() {
+			
+		}
 
 	}
 }
@@ -53,3 +58,37 @@ a test to see\
 what will happen';
 
 var Jelle = new Person('Jelle', 25, {test: true});
+
+var callback = new Person('Griet', 40, function test (){
+	console.log('test')
+});
+
+io.set('transports', [
+	'websocket'
+	, 'flashsocket'
+	, 'htmlfile'
+	, 'xhr-polling'
+	, 'jsonp-polling'
+]);
+
+namedblock: {
+	var namedtest = '';
+
+	var objtest = {
+		'zever': {
+			'hello': true
+		}
+	}
+}
+
+for (var i = 0; i < test; i++)
+dosomething();
+
+for (var i = 0; i < test; i++) {
+	doSomethingElse();
+}
+
+if (test)
+onlyif = {
+	"multi": true
+};
