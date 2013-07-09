@@ -269,6 +269,49 @@ def extractDocblocks(text):
 
 	return resultText, resultArray
 
+## Get the characters before, and after the id
+#  @param   text   The text
+#  @param   id     The current id
+def getSurround(text, id):
+
+	previous = ''
+	next = ''
+
+	length = len(text)
+
+	# Get the previous character
+	if id-1 > -1:
+		previous = text[id-1]
+
+	# Get the after character
+	if id+1 < length:
+		next = text[id+1]
+
+	return previous, next
+
+## Find a text before
+#  @param   text   The text
+#  @param   id     The current position
+#  @param   word  The word to find
+def hasWordBefore(text, id, word):
+
+	piece = text[:id].strip()
+
+	if not piece.endswith(word):
+		return False
+	else:
+		# Make sure it's actually a word, not part of something else
+		wordlength = len(word)
+		maxPieceId = len(piece)-1
+
+		# Get the char before the word
+		before = text[maxPieceId-wordlength]
+
+		if before == ' ' or before == '\n' or before == '\t' or before == '=':
+			return True
+		else:
+			return False
+
 ## Split a line containing multiple statements
 #  @param   text   The line to split
 def splitStatements(text):
@@ -282,6 +325,9 @@ def splitStatements(text):
 	# The working piece
 	working = ''
 
+	# Debug info
+	debug = ''
+
 	# The line number
 	lineNr = 1
 	beginLineNr = 1
@@ -294,14 +340,25 @@ def splitStatements(text):
 	length = len(text)
 	append = False
 	lineType = False
+	lettersBefore = False
+	colonBefore = False
+	parenBefore = False
+	closeParenBefore = False
+	equalBefore = False
+	commaBefore = False
+	hasFunction = False
+	functionParameters = False
+	inParamParens = 0
+	functionBody = False
+
+	# Count the number of open object literals
+	openObject = 0
 
 	for i, c in enumerate(text):
 
-		if i+1 < length:
-			next = text[i+1]
-		else:
-			next = ''
-
+		# Get the surrounding characters
+		(prev, next) = getSurround(text, i)
+		
 		# If c is a backslash, invert the backslash status
 		if c == "\\":
 			backslash = not backslash
@@ -340,7 +397,6 @@ def splitStatements(text):
 			working = c
 		elif c == "/" and next == "/": # Inline comment, we just remove these
 			inlineCommentOpen = True
-			beginLineNr = lineNr
 
 			if working.strip():
 				append = working
@@ -356,11 +412,21 @@ def splitStatements(text):
 
 				if prev == '}':
 					append = False
-			if c == '{':
+			elif (parenBefore or equalBefore or (openObject and colonBefore)) and c == '{':
+				openObject += 1
+				beginLineNr = lineNr
+			elif openObject and c == '}':
+				openObject -= 1
+
+				if openObject == 0:
+					append = working
+					working = ''
+
+			elif c == '{':
 				append = working
 				lineType = 'openblock'
 				working = ''
-			if c == '}':
+			elif c == '}':
 				append = working
 				lineType = 'closeblock'
 				working = ''
@@ -370,8 +436,97 @@ def splitStatements(text):
 
 			elif c == '"':
 				stringOpen = '"'
+				beginLineNr = lineNr
 			elif c == "'":
 				stringOpen = "'"
+				beginLineNr = lineNr
+
+		# If c is not a backslash, the backslash status for
+		# the next iteration is false again
+		if not c == "\\":
+			backslash = False
+
+		# Determin characters before the next char
+		if not stringOpen:
+			# Are there letters before the next char?
+			if c.isalpha() or c == '$' or c == '_':
+				lettersBefore = True
+			elif lettersBefore and (c.isnumeric() or c == ' ' or c == '\t'):
+				pass
+			else:
+				lettersBefore = False
+
+			# Is there an colon somewhere before the next char?
+			if c == ':':
+				colonBefore = True
+			elif colonBefore and (c == ' ' or c == '\n' or c == '\t'):
+				pass
+			else:
+				colonBefore = False
+
+			# Find parens inside parameters
+			if functionParameters and c == '(':
+				inParamParens += 1
+			elif functionParameters and c == ')':
+				if inParamParens == 0:
+					functionParameters = False
+				else:
+					inParamParens -= 1
+
+			# Look for function body
+			if hasFunction and not functionParameters and not functionBody and c == '{':
+				functionBody = True
+
+			if hasFunction and functionBody and openObject == 0 and c == '}':
+				functionBody = False
+				hasFunction = False
+
+			# Look for parameters
+			if not functionParameters and hasFunction and c == '(':
+				functionParameters = True
+
+			# Look for the function statement
+			if not functionBody and not functionParameters and c == ' ' or c == '\t':
+				hasFunction = hasWordBefore(text, i, 'function')
+
+			# Is there an open paren before the next char?
+			# This does NOT count open parens, because once a different char
+			# has been found, this is false!
+			if c == '(':
+				parenBefore = True
+			elif parenBefore and (c == ' ' or c == '\n' or c == '\t'):
+				pass
+			else:
+				parenBefore = False
+
+			# Detect a close paren
+			if c == ')':
+				closeParenBefore = True
+			elif closeParenBefore and (c == ' ' or c == '\n' or c == '\t'):
+				pass
+			else:
+				closeParenBefore = False
+
+			# Detect an equal sign
+			if c == '=':
+				equalBefore = True
+			elif equalBefore and (c == ' ' or c == '\t'):
+				pass
+			else:
+				equalBefore = False
+
+			# Detect a comma
+			if c == ',':
+				commaBefore = True
+			elif commaBefore and (c == ' ' or c == '\t' or c == '\n'):
+				pass
+			else:
+				commaBefore = False
+
+			# If a newline begins see if it's the end of this statement
+			if c == '\n' and not docblockOpen and not openObject and not commaBefore and not closeParenBefore:
+				append = working
+				working = ''
 
 		# If the append is set, append it
 		if append and append.strip():
@@ -383,14 +538,7 @@ def splitStatements(text):
 			append = False
 			lineType = False
 			beginLineNr = False
-
-		# If c is not a backslash, the backslash status for
-		# the next iteration is false again
-		if not c == "\\":
-			backslash = False
-
-		# Set prev for next iteration
-		prev = c
+			debug = ''
 
 		# If c is a return, increase the linenr
 		if c == "\n":
