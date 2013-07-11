@@ -298,6 +298,30 @@ operators = ['+', '=', '-', '*', '/', '%', '<', '>', '~']
 # Things that denote expressions
 expressionizers = ['+', '=', '-', '*', '/', '%', '<', '>', '~', '(', ',']
 
+# This list is far from finished, just for testing!
+wordDelim = [',', ' ', '\n', '\t', '(', ')', '{', '}', '[', ']']
+
+def startsWith(text, word, id = False):
+
+	if id > -1:
+		text = text[id:]
+	
+	if not text.startswith(word):
+		return False
+	else:
+		# Make sure it's actually a word, not part of something else
+		wordlength = len(word)
+		maxTextId = len(text)-1
+
+		# Get the char after the word
+		after = text[wordlength]
+
+		if after in wordDelim or after in expressionizers:
+			return True
+		else:
+			return False
+
+
 ## Find a text before
 #  @param   text   The text
 #  @param   id     The current position
@@ -354,11 +378,106 @@ def isArrayLiteral(text, id):
 	else:
 		return False
 
+statements = {
+	'docblock': {
+		'begins': '/*',
+		'ends': '*/',
+		'strict': True
+	},
+	'var': {
+		'begins': 'var',
+		'ends': False,
+		'strict': False,
+		'name': 1,
+		'parens': False,
+		'block': False,
+		'grouping': ',',
+		'expressions': True
+	},
+	'function': {
+		'begins': 'function',
+		'strict': False,
+		'name': 1,
+		'parens': 2,
+		'block': 3
+	}
+}
+
+def determineOpen(text, id):
+
+	# Do not strip the text here,
+	# It'll mess up the line numbers
+	text = text[id:]
+
+	# Is it a statement?
+	for name, props in statements.items():
+
+		# Strict means we don't care what comes after the opening tag
+		if props['strict']:
+			if text.startswith(props['begins']):
+				print({'id': id, 'det': text})
+				return 'statement', name
+		else:
+			if startsWith(text, props['begins']):
+				print({'id': id, 'det': text})
+				return 'statement', name
+
+	return False, False
+
+
+
+def splitStatements(text):
+
+	# The total length of the text
+	length = len(text)
+
+	# The max char id in the text
+	maxId = length-1
+
+	# The current id
+	id = 0
+
+	# The line nr
+	lineNr = 1
+
+	# The current open type
+	openType = False
+	openName = False
+
+	# Go over every letter
+	while id < length:
+
+		# Get the current char
+		cur = text[id]
+
+		# Get the surrounding characters
+		(prev, next) = getSurround(text, id)
+
+		# If nothing is open, see what the next statement does
+		if not openType:
+
+			if not cur in [' ', '\n', '\t']:
+				(openType, openName) = determineOpen(text, id)
+
+				if openType:
+					print('LineNr ' + str(lineNr) + ' begins a ' + str(openName) + ' ' + str(openType))
+		else:
+			pass
+
+		if cur == '\n':
+			lineNr += 1
+
+		#if cur == '\n' or cur == ';':
+		#	openType = False
+
+		id += 1
+
+
 
 ## Split a block (including a complete text file)
 #  into multiple statements
 #  @param   text   The line to split
-def splitStatements(text):
+def oldsplitStatements(text):
 
 	# Where all the result statements go
 	results = []
