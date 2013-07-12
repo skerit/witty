@@ -2,7 +2,7 @@
 # These functions are used throughout the Witty plugin,
 # and are mainly for getting information out of code
 #
-import os, re, threading, pprint, json, pickle, hashlib, inspect, sublime
+import os, re, threading, pprint, json, pickle, hashlib, inspect, sublime, datetime
 
 doDebug = False
 
@@ -378,30 +378,210 @@ def isArrayLiteral(text, id):
 	else:
 		return False
 
-statements = {
-	'docblock': {
-		'begins': '/*',
-		'ends': '*/',
-		'strict': True
-	},
-	'var': {
-		'begins': 'var',
-		'ends': False,
-		'strict': False,
-		'name': 1,
-		'parens': False,
-		'block': False,
-		'grouping': ',',
-		'expressions': True
-	},
+
+class LOC:
+
+	# Type
+	type = None
+
+	# Name
+	name = None
+
+	# The string that begins this LOC
+	begins = None
+
+	# The string that ends this LOC
+	ends = None
+
+	# If a begin is greedy, it does not
+	# care what comes after it
+	# (If it's a whole word or not)
+	greedy = None
+
+	# Naming things
+	namePosition = None
+	nameRequired = None
+
+	# Paren location
+	parenPosition = None
+	parenRequired = None
+
+	# Block location
+	blockPosition = None
+	blockRequired = None
+
+	# Is there an expression anywhere?
+	expressionPosition = None
+	expressionRequired = None
+
+	# If one "begins" can be used for
+	# multiple name-paren-block
+	grouping = None
+
+	def setBegin(self, string):
+		self.begins = string
+
+	def setEnd(self, string):
+		self.ends = string
+
+	def setGreedy(self, greedy):
+		self.greedy = greedy
+
+	def setName(self, order, required = False):
+		self.namePosition = order
+		self.nameRequired = required
+
+	def setParen(self, order, required = False):
+		self.parenPosition = order
+		self.parenRequired = required
+
+	def setBlock(self, order, required = False):
+		self.blockPosition = order
+		self.blockRequired = required
+
+	def setExpression(self, order, required = False):
+		self.expressionPosition = order
+		self.expressionRequired = required
+
+	def setGroup(self, delimiter):
+		self.grouping = delimiter
+
+	def extract(self, text):
+
+		if self.greedy:
+			return self.extractGreedy(text)
+
+	def extractGreedy(self, text):
+
+
+
+		print('Enumerate')
+		a = datetime.datetime.now()
+		t = ''
+		for i, c in enumerate(text):
+			t += c
+		b = datetime.datetime.now()
+		c = b - a
+
+		print('Enumerate in ' + str(c.microseconds) + ' microseconds')
+
+		print('Length')
+
+		a = datetime.datetime.now()
+		l = len(text)
+		i = 0
+		t = ''
+
+		while i < l:
+			t += text[i]
+			i += 1
+
+		b = datetime.datetime.now()
+		c = b - a
+
+		print('Length in ' + str(c.microseconds) + ' microseconds')
+
+		print('Try')
+
+		a = datetime.datetime.now()
+		i = 0
+		t = ''
+
+		while True:
+			
+			try: 
+				t += text[i]
+			except IndexError:
+				break
+
+			i += 1
+
+		b = datetime.datetime.now()
+		c = b - a
+
+		print('Length in ' + str(c.microseconds) + ' microseconds')
+
+
+statements = {}
+expressions = {}
+
+class Statement(LOC):
+
+	type = 'statement'
+
+	def __init__(self, name):
+		self.name = name
+		statements[name] = self
+	
+
+class Expression(LOC):
+
+	type = 'expression'
+
+	def __init__(self, name):
+		self.name = name
+		expressions[name] = self
+
+
+
+docblock = Statement('docblock')
+docblock.setBegin('/*')
+docblock.setEnd('*/')
+docblock.setGreedy(True)
+
+var = Statement('var')
+var.setBegin('var')
+var.setName(1, True)
+var.setExpression(2)
+var.setGroup(',')
+
+
+# statements = {
+# 	'var': {
+# 		'begins': 'var',
+# 		'ends': False,
+# 		'strict': False,
+# 		'name': 1,
+# 		'parens': False,
+# 		'block': False,
+# 		'grouping': ',',
+# 		'expressions': True
+# 	},
+# 	'function': {
+# 		'begins': 'function',
+# 		'strict': False,
+# 		'name': 1,
+# 		'parens': 2,
+# 		'block': 3
+# 	}
+# }
+
+expressions = {
 	'function': {
 		'begins': 'function',
 		'strict': False,
 		'name': 1,
 		'parens': 2,
 		'block': 3
-	}
+	},
+	'paren': {
+		'begins': '(',
+		'ends': ')',
+		'strict': True
+	},
 }
+
+## See if a char is a space or a tab
+def isSpacing(char):
+	if char == ' ' or char == '\t':
+		return True
+	return False
+
+## See if a char is a space, a tab or a newline
+def isWhitespace(char):
+	if isSpacing(char) or char == '\n':
+		return True
+
 
 def determineOpen(text, id):
 
@@ -410,16 +590,18 @@ def determineOpen(text, id):
 	text = text[id:]
 
 	# Is it a statement?
-	for name, props in statements.items():
+	for name, stat in statements.items():
 
 		# Strict means we don't care what comes after the opening tag
-		if props['strict']:
-			if text.startswith(props['begins']):
-				print({'id': id, 'det': text})
+		if stat.greedy:
+			if text.startswith(stat.begins):
+				result = stat.extract(text)
+				print({'id': id, 'det': result})
 				return 'statement', name
 		else:
-			if startsWith(text, props['begins']):
-				print({'id': id, 'det': text})
+			if startsWith(text, stat.begins):
+				result = stat.extract(text)
+				print({'id': id, 'det': result})
 				return 'statement', name
 
 	return False, False
@@ -456,7 +638,7 @@ def splitStatements(text):
 		# If nothing is open, see what the next statement does
 		if not openType:
 
-			if not cur in [' ', '\n', '\t']:
+			if not isWhitespace(cur):
 				(openType, openName) = determineOpen(text, id)
 
 				if openType:
