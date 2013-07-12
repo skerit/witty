@@ -334,7 +334,12 @@ def hasCharsAfter(text, word, id = False, checkForSpace = False):
 
 def getCharAfterId(text, word, id = False, checkForSpace = False):
 
-	isPresent = hasCharsAfter(text, word, id, checkForSpace)
+	if not checkForSpace:
+		temp = text.strip()
+	else:
+		temp = text
+
+	isPresent = hasCharsAfter(temp, word, id, checkForSpace)
 
 	if not isPresent:
 		return False
@@ -484,28 +489,29 @@ class LOC:
 	def setGroup(self, delimiter):
 		self.grouping = delimiter
 
-	def setExtra(self, order, char, required = False):
+	def setExtra(self, order, char, required = False, options = False):
 		self.extras[order] = {
 			'char': char,
 			'position': order,
-			'required': required
+			'required': required,
+			'options': options
 		}
 
 
 	def getNextTarget(self, position):
 
 		if position in self.extras:
-			return self.extras[position]['char'], self.extras[position]['required']
+			return self.extras[position]['char'], self.extras[position]['required'], self.extras[position]['options']
 		elif self.namePosition == position:
-			return 'name', self.nameRequired
+			return 'name', self.nameRequired, False
 		elif self.parenPosition == position:
-			return 'paren', self.parenRequired
+			return 'paren', self.parenRequired, False
 		elif self.blockPosition == position:
-			return 'block', self.blockRequired
+			return 'block', self.blockRequired, False
 		elif self.expressionPosition == position:
-			return 'expression', self.expressionRequired
+			return 'expression', self.expressionRequired, False
 
-		return False, False
+		return False, False, False
 
 
 	def extract(self, text, startId):
@@ -528,15 +534,18 @@ class LOC:
 
 			extractions = {'beginId': id}
 
+			# Has an expresison already begun?
+			expressionHasBegun = False
+
 			# See what we have to do next
 			while True:
 
 				position += 1
 
-				(targetName, targetRequired) = self.getNextTarget(position)
+				(targetName, targetRequired, extraOptions) = self.getNextTarget(position)
 
 				if targetName == 'name':
-					(result, endId, newLines) = self.extractName(rest)
+					(result, endId, newLines) = self.extractName(text[id:])
 
 					# Store the result in the extractions
 					extractions['name'] = {
@@ -548,11 +557,11 @@ class LOC:
 					# Set the next Id
 					id = id+endId+1
 
-					# Get the new rest
-					rest = text[id:]
+					print(extractions)
 
 				elif targetName == 'expression':
-					(result, endId, newLines) = self.extractExpression(rest)
+
+					(result, endId, newLines) = self.extractExpression(text[id:], expressionHasBegun)
 
 					# Work on this next!
 
@@ -567,16 +576,17 @@ class LOC:
 					}
 
 					# Set the next Id
-					id = endId+1
+					id = id+endId+1
 
 					# Get the new rest
 					rest = text[id:]
 				elif targetName:
-					
-					# Get extra stuff
-					endId = getCharAfterId(rest, targetName)
 
-					print('Get extra >> ' + str(endId))
+					if extraOptions == 'expressionHasBegun':
+						expressionHasBegun = True
+
+					# Get extra stuff
+					endId = getCharAfterId(text[id:], targetName)
 
 					if endId or endId > -1:
 						extractions[targetName] = {
@@ -586,7 +596,7 @@ class LOC:
 						}
 						
 						# Set the next Id
-						id = endId+1
+						id = id+endId+1
 
 						# Get the new rest
 						rest = text[id:]
@@ -600,19 +610,16 @@ class LOC:
 				else:
 					break
 
-			print({'rest':rest})
-			print(extractions)
+			pr({'rest':rest})
+			pr(extractions)
 
-	def extractExpression(self, text):
+	def extractExpression(self, text, hasBegun = False):
 
 		# The new lines we've encountered
 		newLines = 0
 		
 		# Result
 		result = ''
-
-		# Has the expression begin?
-		hasBegun = False
 
 		for i, c in enumerate(text):
 
@@ -624,9 +631,17 @@ class LOC:
 				# Skip whitespaces
 				if isWhitespace(c):
 					continue
+			else:
+				# Extract everything between parens
+				if c == '(':
+					(tempResult, tempEndId, tempNewLines) = self.extractParen(text[i:])
+					print('>>>')
+					print(tempResult)
+					print('<<<')
+
 
 	def extractParen(self, text):
-		return extractBetween(text, '(', ')')
+		return self.extractBetween(text, '(', ')')
 
 	def extractName(self, text):
 
@@ -698,7 +713,7 @@ class LOC:
 			if c == '\n':
 				newLines += 1
 
-			# If c is a backslash, invert the backslash status
+			# If c is a escape, invert the escape status
 			if c == "\\":
 				escape = not escape
 
@@ -709,8 +724,8 @@ class LOC:
 				result = result + c
 
 				# And the new char is the same literal,
-				# and it wasn't backslash-escaped
-				if c == stringOpen and not backslash:
+				# and it wasn't escaped
+				if c == stringOpen and not escape:
 					stringOpen = False
 
 			if not isOpen:
@@ -833,7 +848,7 @@ var = Statement('var')
 var.setBegin('var')
 var.setName(1, True)
 var.setExpression(3)
-var.setExtra(2, '=', True)
+var.setExtra(2, '=', True, 'expressionHasBegun')
 var.setGroup(',')
 
 
@@ -900,7 +915,7 @@ def determineOpen(text, id):
 				return 'statement', name, id, newId+id, result, newLines
 		else:
 			if hasCharsAfter(text, stat.begins):
-				print('A statement called ' + name + ' begins at ' + str(id))
+				pr('A statement called ' + name + ' begins at ' + str(id))
 				result, newId, newLines = stat.extract(text, id)
 				return 'statement', name, id, newId+id, result, newLines
 
@@ -942,7 +957,7 @@ def splitStatements(text):
 				(openType, openName, beginId, endId, result, newLines) = determineOpen(text, id)
 
 				if openType:
-					print({'type': openType, 'typeName': openName, 'beginId': beginId, 'endId': endId, 'result': result, 'newlines': newLines})
+					pr({'type': openType, 'typeName': openName, 'beginId': beginId, 'endId': endId, 'result': result, 'newlines': newLines})
 					id = beginId
 					openType = False
 					#print('LineNr ' + str(lineNr) + ' begins a ' + str(openName) + ' ' + str(openType))
@@ -1299,9 +1314,9 @@ def postNormalize(inputArray, recurse = False):
 
 		if openBlock == 1 and next['type'] == 'closeblock':
 			if recurse:
-				print('>> ' + str(next))
+				pr('>> ' + str(next))
 			if not recurse:
-				print(next)
+				pr(next)
 
 			# If the next statement will close this block...
 			# Recursively add body statements to this one
@@ -1321,7 +1336,7 @@ def postNormalize(inputArray, recurse = False):
 	if not recurse:
 		for x in results:
 			pass
-			print(x)
+			pr(x)
 
 	return results
 

@@ -16,11 +16,11 @@
  * @property {string}   firstname   The name of this person
  */
 var Person =
-function(firstname, age, data) {
+(function(firstname, age, data) {
 
 	this.firstname = firstname
 	
-}
+})
 
 var thisIsNotAGlobal = 10
 
