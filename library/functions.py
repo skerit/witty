@@ -301,11 +301,14 @@ expressionizers = ['+', '=', '-', '*', '/', '%', '<', '>', '~', '(', ',']
 # This list is far from finished, just for testing!
 wordDelim = [',', ' ', '\n', '\t', '(', ')', '{', '}', '[', ']']
 
-def startsWith(text, word, id = False):
+def hasWordAfter(text, word, id = False):
+	return hasCharsAfter(text, word, id, True)
+
+def hasCharsAfter(text, word, id = False, checkForSpace = False):
 
 	if id > -1:
 		text = text[id:]
-	
+
 	if not text.startswith(word):
 		return False
 	else:
@@ -313,13 +316,32 @@ def startsWith(text, word, id = False):
 		wordlength = len(word)
 		maxTextId = len(text)-1
 
-		# Get the char after the word
-		after = text[wordlength]
+		# Get the chars that should match
+		after = text[:wordlength]
 
-		if after in wordDelim or after in expressionizers:
-			return True
+		if after == word:
+
+			if checkForSpace:
+				extraChar = text[wordlength-1:1]
+				if extraChar in wordDelim:
+					return True
+				else:
+					return False
+			else:
+				return True
 		else:
 			return False
+
+def getCharAfterId(text, word, id = False, checkForSpace = False):
+
+	isPresent = hasCharsAfter(text, word, id, checkForSpace)
+
+	if not isPresent:
+		return False
+	else:
+		for i, c in enumerate(text):
+			if c == word:
+				return i
 
 
 ## Find a text before
@@ -368,6 +390,7 @@ def hasCharBefore(text, id, char, ignore = [], ignoreWhitespace = True):
 	else:
 		return False
 
+
 ## Check if id is an opening array literal
 def isArrayLiteral(text, id):
 
@@ -375,6 +398,18 @@ def isArrayLiteral(text, id):
 
 	if char == '[':
 		return hasCharBefore(text, id, ['+', '=', '-', '*', '/', '%', '<', '>', '~', '(', ',', ';'])
+	else:
+		return False
+
+## Check if a char is a valid part of a name
+#  @param   char          The char to check
+#  @param   beginOfName   Is this the begin of the name?
+def isValidName(char, beginOfName = False):
+
+	if char.isalpha() or char in ['_', '$']:
+		return True
+	elif char.isnumeric() and not beginOfName:
+		return True
 	else:
 		return False
 
@@ -414,6 +449,9 @@ class LOC:
 	expressionPosition = None
 	expressionRequired = None
 
+	# Extra settings
+	extras = {}
+
 	# If one "begins" can be used for
 	# multiple name-paren-block
 	grouping = None
@@ -446,60 +484,322 @@ class LOC:
 	def setGroup(self, delimiter):
 		self.grouping = delimiter
 
-	def extract(self, text):
+	def setExtra(self, order, char, required = False):
+		self.extras[order] = {
+			'char': char,
+			'position': order,
+			'required': required
+		}
+
+
+	def getNextTarget(self, position):
+
+		if position in self.extras:
+			return self.extras[position]['char'], self.extras[position]['required']
+		elif self.namePosition == position:
+			return 'name', self.nameRequired
+		elif self.parenPosition == position:
+			return 'paren', self.parenRequired
+		elif self.blockPosition == position:
+			return 'block', self.blockRequired
+		elif self.expressionPosition == position:
+			return 'expression', self.expressionRequired
+
+		return False, False
+
+
+	def extract(self, text, startId):
 
 		if self.greedy:
 			return self.extractGreedy(text)
+		else:
 
+			# Get the beginning
+			begin = self.begins
+
+			# Get the new current id
+			id = len(begin)
+
+			# Remove the beginning
+			rest = text[id:]
+
+			# Position
+			position = 0
+
+			extractions = {'beginId': id}
+
+			# See what we have to do next
+			while True:
+
+				position += 1
+
+				(targetName, targetRequired) = self.getNextTarget(position)
+
+				if targetName == 'name':
+					(result, endId, newLines) = self.extractName(rest)
+
+					# Store the result in the extractions
+					extractions['name'] = {
+						'name': result,
+						'beginId': id,
+						'endId': id+endId
+					}
+
+					# Set the next Id
+					id = id+endId+1
+
+					# Get the new rest
+					rest = text[id:]
+
+				elif targetName == 'expression':
+					(result, endId, newLines) = self.extractExpression(rest)
+
+					# Work on this next!
+
+				elif targetName == 'paren':
+					(result, endId, newLines) = self.extractParen(rest)
+
+					# Store the result in the extractions
+					extractions['paren'] = {
+						'content': result,
+						'beginId': id,
+						'endId': endId
+					}
+
+					# Set the next Id
+					id = endId+1
+
+					# Get the new rest
+					rest = text[id:]
+				elif targetName:
+					
+					# Get extra stuff
+					endId = getCharAfterId(rest, targetName)
+
+					print('Get extra >> ' + str(endId))
+
+					if endId or endId > -1:
+						extractions[targetName] = {
+							'content': targetName,
+							'beginId': id,
+							'endId': endId
+						}
+						
+						# Set the next Id
+						id = endId+1
+
+						# Get the new rest
+						rest = text[id:]
+					else:
+						
+						if targetRequired:
+							break
+						else:
+							continue
+
+				else:
+					break
+
+			print({'rest':rest})
+			print(extractions)
+
+	def extractExpression(self, text):
+
+		# The new lines we've encountered
+		newLines = 0
+		
+		# Result
+		result = ''
+
+		# Has the expression begin?
+		hasBegun = False
+
+		for i, c in enumerate(text):
+
+			if c == '\n':
+				newLines += 1
+
+			if not hasBegun:
+				
+				# Skip whitespaces
+				if isWhitespace(c):
+					continue
+
+	def extractParen(self, text):
+		return extractBetween(text, '(', ')')
+
+	def extractName(self, text):
+
+		# The new lines we've encountered
+		newLines = 0
+		
+		# Result
+		result = ''
+
+		# Has the name begin?
+		hasBegun = False
+
+		for i, c in enumerate(text):
+
+			if c == '\n':
+				newLines += 1
+
+			# If the name hasn't begun yet
+			if not hasBegun:
+
+				# Skip spaces
+				if isSpacing(c):
+					continue
+
+				# See if it's a valid start
+				if isValidName(c, True):
+					hasBegun = True
+					result += c
+			else:
+				# The name has begun!
+
+				if isValidName(c):
+					result += c
+				else:
+					# It's not a valid part of a name, so finish!
+					break
+
+		endId = i-1
+
+		return result, endId, newLines
+
+
+	def extractBegin(self, text):
+		pass
+
+	def extractBetween(self, text, open, close):
+
+		# The new lines we've encountered
+		newLines = 0
+
+		# Result
+		result = ''
+
+		# Counter
+		betweenOpen = 0
+
+		# Stringopen
+		stringOpen = False
+
+		# Escape
+		escape = False
+
+		# Between is open
+		isOpen = False
+
+		for i, c in enumerate(text):
+
+			# Count newlines
+			if c == '\n':
+				newLines += 1
+
+			# If c is a backslash, invert the backslash status
+			if c == "\\":
+				escape = not escape
+
+			# If a string is open
+			if stringOpen:
+
+				# Add the current char no matter what
+				result = result + c
+
+				# And the new char is the same literal,
+				# and it wasn't backslash-escaped
+				if c == stringOpen and not backslash:
+					stringOpen = False
+
+			if not isOpen:
+
+				# Skip whitespaces
+				if isWhitespace(c):
+					continue
+				elif c == open:
+					isOpen = True
+					betweenOpen = 1
+					result += c
+				else:
+					break
+			# We have started!
+			else:
+
+				endId = i
+				result = result + c
+
+				# First do some string checking
+				if c == "'":
+					stringOpen = "'"
+				elif c == '"':
+					stringOpen = '"'
+				else:
+					if c == open:
+						betweenOpen += 1
+					elif c == close:
+						betweenOpen -= 1
+
+						# If we closed the last one...
+						if betweenOpen == 0:
+							break
+
+			endId = i
+
+		return result, endId, newLines
+
+
+
+	# Extract a greedy statement, one that does not care
+	# what comes between begin and end char, like /* */
 	def extractGreedy(self, text):
 
+		# The new lines we've encountered
+		newLines = 0
+		
+		# Skip to id
+		skipToId = False
 
+		# Include to id
+		includeToId = False
 
-		print('Enumerate')
-		a = datetime.datetime.now()
-		t = ''
+		# Include to and end at this id
+		endAtId = False
+
+		# Result
+		result = ''
+
 		for i, c in enumerate(text):
-			t += c
-		b = datetime.datetime.now()
-		c = b - a
 
-		print('Enumerate in ' + str(c.microseconds) + ' microseconds')
+			# Count newlines
+			if c == '\n':
+				newLines += 1
 
-		print('Length')
+			if skipToId and i <= skipToId:
+				continue
+			elif includeToId and i <= includeToId:
+				result += c
+				continue
+			elif endAtId and i <= endAtId:
+				result += c
 
-		a = datetime.datetime.now()
-		l = len(text)
-		i = 0
-		t = ''
+				if endAtId == i:
+					break
 
-		while i < l:
-			t += text[i]
-			i += 1
+			if i == 0:
+				if text.startswith(self.begins):
+					includeToId = len(self.begins) - 1
+			else:
+				if hasCharsAfter(text, self.ends, i):
+					endAtId = i + (len(self.ends)-1)
 
-		b = datetime.datetime.now()
-		c = b - a
+			result += c
+		
+		endId = i
 
-		print('Length in ' + str(c.microseconds) + ' microseconds')
+		return result, endId, newLines
 
-		print('Try')
-
-		a = datetime.datetime.now()
-		i = 0
-		t = ''
-
-		while True:
-			
-			try: 
-				t += text[i]
-			except IndexError:
-				break
-
-			i += 1
-
-		b = datetime.datetime.now()
-		c = b - a
-
-		print('Length in ' + str(c.microseconds) + ' microseconds')
 
 
 statements = {}
@@ -532,7 +832,8 @@ docblock.setGreedy(True)
 var = Statement('var')
 var.setBegin('var')
 var.setName(1, True)
-var.setExpression(2)
+var.setExpression(3)
+var.setExtra(2, '=', True)
 var.setGroup(',')
 
 
@@ -595,16 +896,15 @@ def determineOpen(text, id):
 		# Strict means we don't care what comes after the opening tag
 		if stat.greedy:
 			if text.startswith(stat.begins):
-				result = stat.extract(text)
-				print({'id': id, 'det': result})
-				return 'statement', name
+				result, newId, newLines = stat.extract(text, id)
+				return 'statement', name, id, newId+id, result, newLines
 		else:
-			if startsWith(text, stat.begins):
-				result = stat.extract(text)
-				print({'id': id, 'det': result})
-				return 'statement', name
+			if hasCharsAfter(text, stat.begins):
+				print('A statement called ' + name + ' begins at ' + str(id))
+				result, newId, newLines = stat.extract(text, id)
+				return 'statement', name, id, newId+id, result, newLines
 
-	return False, False
+	return False, False, False, False, False, False
 
 
 
@@ -639,10 +939,13 @@ def splitStatements(text):
 		if not openType:
 
 			if not isWhitespace(cur):
-				(openType, openName) = determineOpen(text, id)
+				(openType, openName, beginId, endId, result, newLines) = determineOpen(text, id)
 
 				if openType:
-					print('LineNr ' + str(lineNr) + ' begins a ' + str(openName) + ' ' + str(openType))
+					print({'type': openType, 'typeName': openName, 'beginId': beginId, 'endId': endId, 'result': result, 'newlines': newLines})
+					id = beginId
+					openType = False
+					#print('LineNr ' + str(lineNr) + ' begins a ' + str(openName) + ' ' + str(openType))
 		else:
 			pass
 
