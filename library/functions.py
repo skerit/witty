@@ -3,6 +3,7 @@
 # and are mainly for getting information out of code
 #
 import os, re, threading, pprint, json, pickle, hashlib, inspect, sublime, datetime
+from decimal import *
 
 doDebug = False
 
@@ -301,34 +302,69 @@ expressionizers = ['+', '=', '-', '*', '/', '%', '<', '>', '~', '(', ',']
 # This list is far from finished, just for testing!
 wordDelim = [',', ' ', '\n', '\t', '(', ')', '{', '}', '[', ']']
 
-def hasWordAfter(text, word, id = False):
-	return hasCharsAfter(text, word, id, True)
+# Opening Statements
+statWords = ['if', 'do', 'while', 'for', 'var', 'try', 'let', 'else', 'case', 'throw', 'const', 'yield', 'continue', 'break', 'debugger']
 
-def hasCharsAfter(text, word, id = False, checkForSpace = False):
+literals = ["'", '"', '{', '[']
+
+def hasWordNext(text, word, id = False):
+	return hasCharsNext(text, word, id, True)
+
+# Look for chars directly after the given text, spaces first invalidate the result
+def hasCharsNext(text, word, id = False, checkForSpace = False):
+	return _hasChars(text, word, id, not checkForSpace)
+
+def hasCharsAfter(text, word, id = False, ignoreEndWhitespace = True):
+	return _hasChars(text, word, id, True, ignoreEndWhitespace)
+
+def _hasChars(text, word, id = False, ignoreBeginningWhitespace = True, ignoreEndWhitespace = True):
+
+	if not len(text):
+		return False
 
 	if id > -1:
-		text = text[id:]
+		try:
+			text = text[id:]
+		except IndexError:
+			return False
 
+	try:
+		# If we should ignore the beginning space, recurse
+		if ignoreBeginningWhitespace and text[0] in whitespace:
+			return _hasChars(text, word, 1, ignoreBeginningWhitespace, ignoreEndWhitespace)
+	except IndexError:
+		return False
+
+	if isinstance(word, list):
+
+		for w in word:
+			result = _hasChars(text, w, ignoreBeginningWhitespace, ignoreEndWhitespace)
+			if result:
+				return True
+
+		return False
+
+	# If this text doesn't start with this word at all, return False
 	if not text.startswith(word):
 		return False
 	else:
-		# Make sure it's actually a word, not part of something else
+		
 		wordlength = len(word)
-		maxTextId = len(text)-1
 
 		# Get the chars that should match
 		after = text[:wordlength]
 
 		if after == word:
 
-			if checkForSpace:
-				extraChar = text[wordlength-1:1]
+			if ignoreEndWhitespace:
+				return True
+			else:
+				# Make sure it's actually a word, not part of something else
+				extraChar = text[wordlength:wordlength+1]
 				if extraChar in wordDelim:
 					return True
 				else:
 					return False
-			else:
-				return True
 		else:
 			return False
 
@@ -339,7 +375,7 @@ def getCharAfterId(text, word, id = False, checkForSpace = False):
 	else:
 		temp = text
 
-	isPresent = hasCharsAfter(temp, word, id, checkForSpace)
+	isPresent = hasCharsNext(temp, word, id, checkForSpace)
 
 	if not isPresent:
 		return False
@@ -347,6 +383,59 @@ def getCharAfterId(text, word, id = False, checkForSpace = False):
 		for i, c in enumerate(text):
 			if c == word:
 				return i
+
+# Get the id for the next given word
+# Does not care about anything inbetween
+def getNextCharId(text, word, id = False):
+
+	if id > -1:
+		text = text[id:]
+	else:
+		id = 0
+
+	length = len(word)
+
+	for i, c in enumerate(text):
+
+		stack = text[i:i+length]
+
+		if stack == word:
+			return id+i
+
+	return False
+
+
+# See if there's an operator somewhere after
+def hasOperatorAfter(text, id = False):
+	
+	if id > -1:
+		text = text[id:]
+
+	if text[0] in operators:
+		return True
+	else:
+		if text[0] in [' ', '\t']:
+			return hasOperatorAfter(text[1:])
+	
+	return False
+
+# See if there's a statement after (simple version)
+def hasStatementAfter(text, id = False):
+
+	try:
+		if id > -1:
+			text = text[id:]
+
+		if isWhitespace(text[0]):
+			return hasStatementAfter(text, 1)
+	except IndexError:
+		return False
+
+	for stat in statWords:
+		if _hasChars(text, stat, False, False, False):
+			return True
+
+	return False
 
 
 ## Find a text before
@@ -417,6 +506,54 @@ def isValidName(char, beginOfName = False):
 		return True
 	else:
 		return False
+
+
+def extractString(text, literal, id = False):
+
+	if id > -1:
+		text = text[id:]
+
+	# Count the newlines
+	newLines = 0
+
+	result = ''
+
+	stringOpen = False
+
+	escaped = False
+
+	for i, c in enumerate(text):
+
+		if c == '\n':
+			newLines += 1
+
+		if not stringOpen:
+
+			if isWhitespace(c):
+				continue
+			elif c == literal:
+				stringOpen = True
+				result += c
+			else:
+				break
+
+		else:
+
+			if c == '\\' and not escaped:
+				escaped = True
+				continue
+
+			if c == literal and not escaped:
+				result += c
+				break
+			elif c == '\n':
+				pass
+			else:
+				if escaped:
+					result += '\\'
+				result += c
+
+	return result, i, newLines
 
 
 class LOC:
@@ -516,6 +653,8 @@ class LOC:
 
 	def extract(self, text, startId):
 
+		a = datetime.datetime.now()
+
 		if self.greedy:
 			return self.extractGreedy(text)
 		else:
@@ -526,25 +665,54 @@ class LOC:
 			# Get the new current id
 			id = len(begin)
 
+			# Text length
+			textLength = len(text)
+
 			# Remove the beginning
 			rest = text[id:]
 
 			# Position
 			position = 0
 
+			# Start a new group?
+			startNewGroup = False
+
 			extractions = {'beginId': id}
 
-			# Has an expresison already begun?
+			groupResult = {'group': []}
+
+			# Has an expression already begun?
 			expressionHasBegun = False
+			waitingForOperand = False
 
 			# See what we have to do next
 			while True:
 
 				position += 1
 
+				# Have we reached the end of the string?
+				if id == textLength:
+					break
+				
+				if self.grouping and text[id] == self.grouping:
+
+					# Add the previous extractions to the group
+					groupResult['group'].append(extractions)
+
+					# Increase the id
+					id = id + 1
+
+					# Create a new extraction
+					extractions = {'beginId': id}
+
+					# Reset the position
+					position = 0
+					continue
+
 				(targetName, targetRequired, extraOptions) = self.getNextTarget(position)
 
 				if targetName == 'name':
+
 					(result, endId, newLines) = self.extractName(text[id:])
 
 					# Store the result in the extractions
@@ -557,13 +725,20 @@ class LOC:
 					# Set the next Id
 					id = id+endId+1
 
-					print(extractions)
-
 				elif targetName == 'expression':
 
-					(result, endId, newLines) = self.extractExpression(text[id:], expressionHasBegun)
+					(result, endId, newLines) = self.extractExpression(text[id:], expressionHasBegun, waitingForOperand)
 
-					# Work on this next!
+					extractions['expression'] = {
+						'text': result,
+						'beginId': id,
+						'endId': id+endId
+					}
+
+					id = id+endId+1
+
+					expressionHasBegun = False
+					waitingForOperand = False
 
 				elif targetName == 'paren':
 					(result, endId, newLines) = self.extractParen(rest)
@@ -584,6 +759,7 @@ class LOC:
 
 					if extraOptions == 'expressionHasBegun':
 						expressionHasBegun = True
+						waitingForOperand = True
 
 					# Get extra stuff
 					endId = getCharAfterId(text[id:], targetName)
@@ -610,10 +786,22 @@ class LOC:
 				else:
 					break
 
-			pr({'rest':rest})
-			pr(extractions)
+			if self.grouping:
+				# Add the last result to the group
+				groupResult['group'].append(extractions)
+				result = groupResult['group']
+			else:
+				result = extractions
 
-	def extractExpression(self, text, hasBegun = False):
+		b = datetime.datetime.now()
+		c = b - a
+
+		pr('Extract took ' + str(c.microseconds) + ' microseconds, or ' + str(Decimal(c.microseconds/1000000).quantize(Decimal('.01'), rounding=ROUND_DOWN)) + ' seconds')
+
+		return result, id-1, newLines
+
+
+	def extractExpression(self, text, hasBegun = False, waitingForOperand = False):
 
 		# The new lines we've encountered
 		newLines = 0
@@ -621,27 +809,176 @@ class LOC:
 		# Result
 		result = ''
 
+		# Skip
+		skipToId = False
+
+		# Is an operand busy?
+		operandBusy = False
+
+		# The possible end position of the statement
+		# Actually: last newline
+		possibleEnd = False
+
+		docblockOpen = False
+		docblockEnd = False
+
 		for i, c in enumerate(text):
 
+			# Always count newlines first
 			if c == '\n':
 				newLines += 1
 
+			# Then see if we need to skip chars
+			if skipToId and i < skipToId:
+				continue
+			elif c == ',':
+				i -= 1
+				break
+			# If the next characters open a comment block, ignore them
+			elif hasCharsAfter(text, '/*', i):
+
+				docblockOpen = getNextCharId(text, '/*', i)
+				skip = getNextCharId(text, '*/', i)
+
+				if skip > -1:
+					skipToId = skip + 2
+					docblockEnd = skip + 1
+					continue
+				else:
+					break
+
+			elif hasCharsAfter(text, '//', i):
+				
+				skip = getNextCharId(text, '\n', i)
+
+				if skip > -1:
+					skipToId = skip+1
+					continue
+				else:
+					break
+
+			elif c == '\n':
+				possibleEnd = i
+
+			# Detect statement delimiters
+			if c == ';':
+				result += c
+				break
+
+			# Skip whitespaces before we begin
 			if not hasBegun:
 				
 				# Skip whitespaces
 				if isWhitespace(c):
 					continue
-			else:
-				# Extract everything between parens
-				if c == '(':
-					(tempResult, tempEndId, tempNewLines) = self.extractParen(text[i:])
-					print('>>>')
-					print(tempResult)
-					print('<<<')
+				else:
+					hasBegun = True
 
+			# If this is a newline, see what comes after!
+			if possibleEnd == i:
+
+				# If a statement follows an enter, stop the expression
+				if hasStatementAfter(text, i):
+					break
+
+				# If waiting for operand, or operand is busy
+				if waitingForOperand or operandBusy:
+					# The newline is allowed
+					pass
+				elif hasCharsAfter(text, ['{', '('], i):
+					# The newline is not allowed
+					break
+				elif hasOperatorAfter(text, i+1):
+					# An operator was found on the newline
+
+					# @todo: actually check for "++" like operators,
+					# because they start a new statement
+
+					# Continue without adding the newline
+					continue
+				else:
+					break
+			
+			if waitingForOperand:
+
+				if operandBusy and isWhitespace(c):
+
+					if hasCharsAfter(text, '.', i):
+						continue
+					elif hasCharsAfter(text, '[', i):
+						continue
+					else:
+						operandBusy = False
+						waitingForOperand = False
+
+				# Extract everything between parens
+				elif c == '(':
+					(tempResult, tempEndId, tempNewLines) = self.extractParen(text[i:])
+					result += '(' + tempResult + ')'
+					skipToId = i+tempEndId+1
+					newLines += tempNewLines
+
+					# The operand is likely done, but we still could see a () call
+					operandBusy = True
+				# Extract literals
+				elif c in literals:
+
+					if c == "'" or c == '"':
+						(tempResult, tempId, tempNewLines) = extractString(text, c, i)
+
+						result += tempResult
+						skipToId = i+tempId+1
+						newLines += tempNewLines
+					elif c == '{':
+						(tempResult, tempEndId, tempNewLines) = self.extractCurly(text[i:])
+						result += '{' + tempResult + '}'
+						skipToId = i+tempEndId+1
+						newLines += tempNewLines
+
+						# The operand is likely done, but we still could see a () call
+						operandBusy = True
+					elif c == '[':
+						(tempResult, tempEndId, tempNewLines) = self.extractSquare(text[i:])
+						result += '[' + tempResult + ']'
+						skipToId = i+tempEndId+1
+						newLines += tempNewLines
+
+						# The operand is likely done, but we still could see a () call
+						operandBusy = True
+					
+				else:
+					result += c
+					operandBusy = True
+
+			else: # Waiting for operator
+
+				if hasOperatorAfter(text, i):
+					waitingForOperand = True
+					result += c
+				else:
+					break
+
+		# If the parsed text ends with a docblock, rewind the ending id
+		if docblockEnd:
+			tempText = text[:i].strip()
+
+			if tempText.endswith('*/'):
+				endId = docblockOpen
+			else:
+				endId = i
+		else:
+			endId = i
+
+		return result.strip(), endId, newLines
 
 	def extractParen(self, text):
 		return self.extractBetween(text, '(', ')')
+
+	def extractCurly(self, text):
+		return self.extractBetween(text, '{', '}')
+
+	def extractSquare(self, text):
+		return self.extractBetween(text, '[', ']')
 
 	def extractName(self, text):
 
@@ -687,6 +1024,7 @@ class LOC:
 	def extractBegin(self, text):
 		pass
 
+	
 	def extractBetween(self, text, open, close):
 
 		# The new lines we've encountered
@@ -727,8 +1065,8 @@ class LOC:
 				# and it wasn't escaped
 				if c == stringOpen and not escape:
 					stringOpen = False
-
-			if not isOpen:
+					
+			elif not isOpen:
 
 				# Skip whitespaces
 				if isWhitespace(c):
@@ -736,14 +1074,12 @@ class LOC:
 				elif c == open:
 					isOpen = True
 					betweenOpen = 1
-					result += c
+					#result += c # Do not add the opener!
 				else:
+					# This is not a space and not an opener, so stop!
 					break
 			# We have started!
 			else:
-
-				endId = i
-				result = result + c
 
 				# First do some string checking
 				if c == "'":
@@ -760,7 +1096,9 @@ class LOC:
 						if betweenOpen == 0:
 							break
 
-			endId = i
+				result = result + c
+
+		endId = i
 
 		return result, endId, newLines
 
@@ -806,7 +1144,7 @@ class LOC:
 				if text.startswith(self.begins):
 					includeToId = len(self.begins) - 1
 			else:
-				if hasCharsAfter(text, self.ends, i):
+				if hasCharsNext(text, self.ends, i):
 					endAtId = i + (len(self.ends)-1)
 
 			result += c
@@ -850,6 +1188,13 @@ var.setName(1, True)
 var.setExpression(3)
 var.setExtra(2, '=', True, 'expressionHasBegun')
 var.setGroup(',')
+
+function = Statement('function')
+function.setBegin('function')
+function.setName(1, False)
+function.setParen(2, True)
+function.setBlock(3, True)
+
 
 
 # statements = {
@@ -914,7 +1259,7 @@ def determineOpen(text, id):
 				result, newId, newLines = stat.extract(text, id)
 				return 'statement', name, id, newId+id, result, newLines
 		else:
-			if hasCharsAfter(text, stat.begins):
+			if hasCharsNext(text, stat.begins):
 				pr('A statement called ' + name + ' begins at ' + str(id))
 				result, newId, newLines = stat.extract(text, id)
 				return 'statement', name, id, newId+id, result, newLines
@@ -941,6 +1286,8 @@ def splitStatements(text):
 	openType = False
 	openName = False
 
+	results = []
+
 	# Go over every letter
 	while id < length:
 
@@ -957,20 +1304,25 @@ def splitStatements(text):
 				(openType, openName, beginId, endId, result, newLines) = determineOpen(text, id)
 
 				if openType:
-					pr({'type': openType, 'typeName': openName, 'beginId': beginId, 'endId': endId, 'result': result, 'newlines': newLines})
-					id = beginId
+					results.append({'beginLine': lineNr, 'type': openType, 'typeName': openName, 'beginId': beginId, 'endId': endId, 'result': result, 'newlines': newLines})
+
+					# Increase the line nr
+					lineNr += newLines
+
+					# 
+					id = endId
 					openType = False
-					#print('LineNr ' + str(lineNr) + ' begins a ' + str(openName) + ' ' + str(openType))
 		else:
 			pass
 
 		if cur == '\n':
 			lineNr += 1
 
-		#if cur == '\n' or cur == ';':
-		#	openType = False
-
 		id += 1
+
+	pr('splitStatements has finished')
+	for r in results:
+		pr(r)
 
 
 
