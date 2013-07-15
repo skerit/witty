@@ -6,60 +6,11 @@ import os, re, threading, pprint, json, pickle, hashlib, inspect, sublime, datet
 from decimal import *
 
 doDebug = False
+debugLevel = 1
 
 # Is something an array?
 def is_array(object):
 	return isinstance(object, (list, tuple))
-
-
-doDebug = False
-debugLevel = 1
-
-#
-# Regexes
-#
-
-# Match docblocks
-reBlocks = re.compile('(\/\*(.*?)\*/)', re.M|re.S)
-
-# Match descriptions
-reDescription = re.compile('\/\*(.*?)[@|\/]', re.M|re.S)
-
-# Docblock properties
-reAt = re.compile('^.*?@(\w+)?[ \t]*(.*)', re.M)
-
-# Simple single-line comments
-reComment = re.compile('^\s*\/\/.*', re.M)
-
-# All comments (including comments inside strings!)
-reComments = re.compile(r'''[ \t]*(?:\/\*(?:.(?!(?<=\*)\/))*\*\/|\/\/[^\n\r]*\n?\r?)''', re.M)
-
-# Get the function name (not the assigned var!)
-reFnName = re.compile('^.*function\s+(\w*?)\s*?\(', re.M)
-
-# Does this line begin with a function call?
-reFnCallBegin = re.compile('^\s*(?!\s)[\w\.\[\]]*\w\(', re.M)
-
-# Get assignment variable names
-reANames = re.compile('(\S*?)\s*\=(?!\=)', re.M)
-
-# Get declaration pairs
-reDeclarations = re.compile('(?= |\,)(\w+)\s*={0,1}\s*.*?(?=,|$)', re.M)
-
-# This works in regexr, but not in python ((?=^| |\,|\,\s+)(\w+)\s*\={0,1}.*?(?=,|$))
-
-reDeclarations = re.compile(r'((?=^| |\,|\,\s+)(\w+)\s*\={0,1}.*?(?=,|$))', re.M)
-
-# Find strings (even with escaped ' and ")
-# Regex is actually (?<!\\)(?:(')|")(?(1)(\\'|[^'\r])+?'|(\\"|[^\r"])+?")
-reStrings = re.compile(r'''(?<!\\)(?:(')|")(?(1)(\\'|[^'\r])+?'|(\\"|[^\r"])+?")''', re.M|re.X)
-
-# Valid javascript variable name regex,
-# this does not include unicode stuff
-reValidName = re.compile('^(?!(?:do|if|in|for|let|new|try|var|case|else|enum|eval|false|null|this|true|void|with|break|catch|class|const|super|throw|while|yield|delete|export|import|public|return|static|switch|typeof|default|extends|finally|package|private|continue|debugger|function|arguments|interface|protected|implements|instanceof)$)[a-zA-Z_$][0-9a-zA-Z_$]*$')
-
-# The same as above, but allow points
-reValidNameWithPoints = re.compile('^(?!(?:do|if|in|for|let|new|try|var|case|else|enum|eval|false|null|this|true|void|with|break|catch|class|const|super|throw|while|yield|delete|export|import|public|return|static|switch|typeof|default|extends|finally|package|private|continue|debugger|function|arguments|interface|protected|implements|instanceof)$)[a-zA-Z_$][0-9a-zA-Z_$\.]*$')
 
 #
 # Log Functions
@@ -247,29 +198,6 @@ def getBetterPrefix(text):
 
 	return text
 
-## Remove docblocks from the code and return them in an array
-#  @param   text         The original code
-#  @returns text,array   Tuple: modified text and docblock array
-def extractDocblocks(text):
-
-	# Find all the docblocks in the original string
-	docblocks = reBlocks.findall(text)
-
-	resultArray = []
-	resultText = ''
-
-	if (docblocks):
-		for match_tupple in docblocks:
-			resultArray.append(match_tupple[0])
-
-	# Remove all single line comments
-	resultText = re.sub(reComment, '', text)
-
-	# Replace all the existing docblocks with a placeholder for easy parsing
-	resultText = re.sub(reBlocks, '//DOCBLOCK//', resultText)
-
-	return resultText, resultArray
-
 ## Get the characters before, and after the id
 #  @param   text   The text
 #  @param   id     The current id
@@ -324,7 +252,7 @@ statWords = ['if', 'do', 'while', 'for', 'var', 'try', 'let', 'else', 'case', 't
 literals = ["'", '"', '{', '[']
 
 def hasWordNext(text, word, id = False):
-	return hasCharsNext(text, word, id, True)
+	return _hasChars(text, word, id, False, False)
 
 # Look for chars directly after the given text, spaces first invalidate the result
 def hasCharsNext(text, word, id = False, checkForSpace = False):
@@ -334,6 +262,8 @@ def hasCharsAfter(text, word, id = False, ignoreEndWhitespace = True):
 	return _hasChars(text, word, id, True, ignoreEndWhitespace)
 
 def _hasChars(text, word, id = False, ignoreBeginningWhitespace = True, ignoreEndWhitespace = True, returnId = False, returnWord = False):
+
+	#pr('Looking for ' + str(word) + ' in text ' + text[id:15] + '... ignoreBeginningWhitespace: ' + str(ignoreBeginningWhitespace) + ' ignoreEndWhitespace: ' + str(ignoreEndWhitespace))
 
 	result = False
 
@@ -1393,8 +1323,6 @@ class Expression(LOC):
 		self.name = name
 		expressions[name] = self
 
-
-
 docblock = Statement('docblock')
 docblock.setBegin('/*')
 docblock.setEnd('*/')
@@ -1412,43 +1340,6 @@ function.setBegin('function')
 function.setName(1, False)
 function.setParen(2, True)
 function.setBlock(3, True)
-
-
-
-# statements = {
-# 	'var': {
-# 		'begins': 'var',
-# 		'ends': False,
-# 		'strict': False,
-# 		'name': 1,
-# 		'parens': False,
-# 		'block': False,
-# 		'grouping': ',',
-# 		'expressions': True
-# 	},
-# 	'function': {
-# 		'begins': 'function',
-# 		'strict': False,
-# 		'name': 1,
-# 		'parens': 2,
-# 		'block': 3
-# 	}
-# }
-
-expressions = {
-	'function': {
-		'begins': 'function',
-		'strict': False,
-		'name': 1,
-		'parens': 2,
-		'block': 3
-	},
-	'paren': {
-		'begins': '(',
-		'ends': ')',
-		'strict': True
-	},
-}
 
 ## See if a char is a space or a tab
 def isSpacing(char):
@@ -1468,6 +1359,8 @@ def determineOpen(text, id):
 	# It'll mess up the line numbers
 	text = text[id:]
 
+	pr({'checking': text[:10]})
+
 	# Is it a statement?
 	for name, stat in statements.items():
 
@@ -1477,7 +1370,7 @@ def determineOpen(text, id):
 				result, newId, newLines = stat.extract(text, id)
 				return 'statement', name, id, newId+id, result, newLines
 		else:
-			if hasCharsNext(text, stat.begins):
+			if hasWordNext(text, stat.begins):
 				pr('A statement called ' + name + ' begins at ' + str(id))
 				result, newId, newLines = stat.extract(text, id)
 				return 'statement', name, id, newId+id, result, newLines

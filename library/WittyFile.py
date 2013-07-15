@@ -51,16 +51,13 @@ class WittyFile:
 		self.parse()
 
 		# Begin the second stage
-		self.secondStage()
+		#self.secondStage()
 
 		wf.log(self.scopes, 'scopes')
 		wf.log({fileName: self.textStatements, 'scopes': self.scopes})
 
 	## Start parsing the file
 	def parse(self):
-
-		# Extract the docblocks
-		(self.working, self.docblocks) = wf.extractDocblocks(self.original)
 
 		# Recursively parse all the statements
 		self.textStatements = self.parseStatements(self.original, self.docblocks)
@@ -83,6 +80,9 @@ class WittyFile:
 		# The running statement
 		s = {}
 		w = ''
+
+		pr('Ending parseStatements')
+		return
 
 		for lineObject in workingLines:
 
@@ -277,6 +277,7 @@ class WittyFile:
 
 	# All the statements have been parsed, now we'll objectify them
 	def secondStage(self):
+
 		results = []
 
 		# Recursively go through all the statements in this file
