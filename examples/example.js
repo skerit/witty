@@ -1,5 +1,14 @@
 
-afunctioncall();
+var test = function test (par) {
+	this.body = true;
+}
 
-var t = 'zever';
-var azerty = 'test' + 1 +50;
+function zever(){
+	die();
+}
+
+functioncall();
+
+var a = 1+1;
+
+for(){a()}

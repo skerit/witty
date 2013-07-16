@@ -283,27 +283,24 @@ def _hasChars(text, word, id = False, ignoreBeginningWhitespace = True, ignoreEn
 
 		try:
 			# If we should ignore the beginning space, recurse
-			if ignoreBeginningWhitespace and text[0] in whitespace:
-				temp = _hasChars(text, word, 1, ignoreBeginningWhitespace, ignoreEndWhitespace, True)
-
-				if temp > -1:
-					result = id + temp
-					break
+			if ignoreBeginningWhitespace and text[id] in whitespace:
+				return _hasChars(text, word, id+1, ignoreBeginningWhitespace, ignoreEndWhitespace, returnId, returnWord)
 
 		except IndexError:
 			break
 
 		if isinstance(word, list):
 
-			for w in word:
+			wordList = word
+			word = False
+
+			for w in wordList:
 				temp = _hasChars(text, w, 0, ignoreBeginningWhitespace, ignoreEndWhitespace, True)
 
 				if temp > -1:
 					word = w
 					result = id + temp
 					break
-				else:
-					word = False
 
 			break
 
@@ -527,6 +524,42 @@ def hasWordBefore(text, id, word):
 		else:
 			return False
 
+def _hasCharsBefore(text, id, word, ignoreBeginningWhitespace = True, ignoreTrailingWhitespace = True):
+
+	if isinstance(id, bool):
+		pass
+	else:
+		text = text[:id]
+
+	# If we can ignore the trailing whitespace, strip the text
+	if ignoreTrailingWhitespace:
+		text = text.strip()
+
+	if isinstance(word, list):
+
+		for w in word:
+			result = _hasCharsBefore(text, False, w, ignoreBeginningWhitespace, False)
+
+			if result:
+				return True
+
+		# If nothing in the list matched, return False
+		return False
+
+	if text.endswith(word):
+		return True
+	else:
+		return False
+
+## Look for chars before the id position,
+#  does not care about spaces before or after the word
+#  @param   text   The text to look
+#  @param   id     The id to look before
+#  @param   word   The word(s) to look for
+def hasCharsBefore(text, id, word):
+	return _hasCharsBefore(text, id, word)
+
+
 ## Find a character before
 def hasCharBefore(text, id, char, ignore = [], ignoreWhitespace = True):
 
@@ -648,8 +681,6 @@ def willExpressionContinue(text, id, hasBegun, waitingForOperand):
 #  @param   waitingForOperand   If we're waiting for an operand
 def extractExpression(text, hasBegun = False, waitingForOperand = False):
 
-	pr({'text': text})
-
 	# The new lines we've encountered
 	newLines = 0
 
@@ -662,8 +693,15 @@ def extractExpression(text, hasBegun = False, waitingForOperand = False):
 	operandBusy = False
 	docblockEnd = False
 
+	# Extra extractions
+	extras = []
+
 	# Loop through the text
 	for i, c in enumerate(text):
+
+		# Skip any characters we might have already added
+		if i < skipToId:
+			continue
 
 		if isWhitespace(c):
 			operandBusy = False
@@ -672,20 +710,31 @@ def extractExpression(text, hasBegun = False, waitingForOperand = False):
 			operandBusy = False
 			waitingForOperand = True
 
+		if c == ';':
+			break
+
 		# Count newlines
 		if c == '\n':
-			willContinue = willExpressionContinue(text, i, hasBegun, waitingForOperand)
 
-			# If the expression has ended, break out!
-			if not willContinue:
-				i -= 1
+			opBefore = hasCharsBefore(text, i, operatorSymbols) or hasCharsBefore(text, i, operatorTokens)
+			opAfter = hasOperatorAfter(text, i)
+
+			if opBefore:
+				pass
+			elif opAfter:
+				pass
+			else:
 				break
 
 			newLines += 1
 
-		# Skip any characters we might have already added
-		if i < skipToId:
-			continue
+			#willContinue = willExpressionContinue(text, i, hasBegun, waitingForOperand)
+
+			# If the expression has ended, break out!
+			#if not willContinue:
+			#	i -= 1
+			#	break
+
 
 		tempWord = False
 
@@ -700,8 +749,10 @@ def extractExpression(text, hasBegun = False, waitingForOperand = False):
 				# Extract the function
 				(fncResult, fncId, fncNewlines) = function.extract(text, i)
 
-				# Add it to the result string
-				result += fncResult
+				extras.append(fncResult)
+
+				# This can't be added to the result
+				result += ' '
 
 				# Skip to the id after it
 				skipToId = i+fncId+1
@@ -710,6 +761,8 @@ def extractExpression(text, hasBegun = False, waitingForOperand = False):
 				newLines += fncNewlines
 
 				waitingForOperand = False
+
+				pr({'skipto': skipToId})
 
 				continue
 
@@ -759,6 +812,7 @@ def extractExpression(text, hasBegun = False, waitingForOperand = False):
 				(tempResult, tempId, tempNewLines) = extractString(text, c, i)
 
 				result += tempResult
+
 				skipToId = i+tempId+1
 				newLines += tempNewLines
 			elif c == '{':
@@ -771,6 +825,10 @@ def extractExpression(text, hasBegun = False, waitingForOperand = False):
 				result += '[' + tempResult + ']'
 				skipToId = i+tempEndId+1
 				newLines += tempNewLines
+
+			pr({'c': c, 'skip': skipToId, 'extractedfrom': text[i:]})
+			pr({'SKIPTO': text[skipToId:skipToId+10]})
+
 
 			waitingForOperand = False
 
@@ -792,11 +850,9 @@ def extractExpression(text, hasBegun = False, waitingForOperand = False):
 	else:
 		endId = i
 
-	return result.strip(), endId, newLines
-			
+	pr({'endid2': i})
 
-
-
+	return {'text': result.strip(), 'functions': extras}, endId, newLines
 
 
 ## If the next line is an expression, extract it
@@ -1166,9 +1222,6 @@ class LOC:
 			# Remove the beginning
 			rest = text[id:]
 
-			
-			pr({'rest': rest[:10]})
-
 			# Position
 			position = 0
 
@@ -1215,9 +1268,6 @@ class LOC:
 
 					(result, endId, newLines) = extractName(text[id:])
 
-					pr('Name')
-					pr(result)
-
 					# Store the result in the extractions
 					extractions['name'] = {
 						'name': result,
@@ -1228,20 +1278,27 @@ class LOC:
 					# Set the next Id
 					id = id+endId+1
 
+					# Get the new rest
+					rest = text[id:]
+
 				elif targetName == 'expression':
 
 					(result, endId, newLines) = extractExpression(text[id:], expressionHasBegun, waitingForOperand)
 
 					extractions['expression'] = {
-						'text': result,
+						'text': result['text'],
 						'beginId': id,
-						'endId': id+endId
+						'endId': id+endId,
+						'functions': result['functions']
 					}
 
 					id = id+endId+1
 
 					expressionHasBegun = False
 					waitingForOperand = False
+
+					# Get the new rest
+					rest = text[id:]
 
 				elif targetName == 'paren':
 
@@ -1259,6 +1316,7 @@ class LOC:
 
 					# Get the new rest
 					rest = text[id:]
+
 				elif targetName == 'block':
 					(result, endId, newLines) = extractCurly(rest)
 
@@ -1278,6 +1336,8 @@ class LOC:
 
 					# Set the next Id
 					id = id+endId+1
+
+					pr(extractions)
 
 					# Get the new rest
 					rest = text[id:]
@@ -1370,6 +1430,8 @@ def extractName(text):
 
 	endId = i - 1
 
+	pr({'name': result, 'endid': endId})
+
 	return result, endId, newLines
 
 def extractParen(text):
@@ -1382,6 +1444,8 @@ def extractSquare(text):
 	return extractBetween(text, '[', ']')
 
 def extractBetween(text, open, close):
+
+	pr({'open': open, 'close': close, 'text': text})
 
 	# The new lines we've encountered
 	newLines = 0
@@ -1455,6 +1519,8 @@ def extractBetween(text, open, close):
 			result = result + c
 
 	endId = i
+
+	pr({'result': result, 'endid': endId})
 
 	return result, endId, newLines
 
@@ -1570,27 +1636,25 @@ def determineOpen(text, id):
 	# It'll mess up the line numbers
 	text = text[id:]
 
-	pr({'checking': text[:10]})
-
 	# Is it a statement?
 	for name, stat in statements.items():
 
 		# Strict means we don't care what comes after the opening tag
 		if stat.greedy:
 			if text.startswith(stat.begins):
-				result, newId, newLines = stat.extract(text, id)
-				return 'statement', name, id, newId+id, result, newLines
+				result, endId, newLines = stat.extract(text, id)
+				return 'statement', name, id, endId, result, newLines
 		else:
 			if hasWordNext(text, stat.begins):
 				pr('A statement called ' + name + ' begins at ' + str(id))
-				result, newId, newLines = stat.extract(text, id)
-				return 'statement', name, id, newId+id, result, newLines
+				result, endId, newLines = stat.extract(text, id)
+				return 'statement', name, id, endId, result, newLines
 
 	# It wasn't a statement, so try getting the expression
-	(result, newId, newLines) = extractExpression(text)
+	(result, endId, newLines) = extractExpression(text)
 
 	if result:
-		return 'expression', 'expression', id, newId+id, result, newLines
+		return 'expression', 'expression', id, endId+id, result, newLines
 
 	return False, False, False, False, False, False
 
@@ -1622,9 +1686,6 @@ def splitStatements(text):
 		# Get the current char
 		cur = text[id]
 
-		# Get the surrounding characters
-		(prev, next) = getSurround(text, id)
-
 		# If nothing is open, see what the next statement does
 		if not openType:
 
@@ -1632,15 +1693,25 @@ def splitStatements(text):
 				(openType, openName, beginId, endId, result, newLines) = determineOpen(text, id)
 
 				if openType:
-					results.append({'beginLine': lineNr, 'type': openType, 'typeName': openName, 'beginId': beginId, 'endId': endId, 'result': result, 'newlines': newLines})
+
+					tempResult = {'beginLine': lineNr, 'type': openType, 'typeName': openName, 'beginId': beginId, 'endId': endId, 'result': result, 'newlines': newLines}
+
+					results.append(tempResult)
 
 					# Increase the line nr
 					lineNr += newLines
 
-					# 
+					# If the endId is smaller than the id we risk an infinite loop
+					if endId < id:
+						pr('====================================')
+						pr('endId is smaller than current id, infinite loop!')
+						pr('====================================')
+						break
+
 					id = endId
 					openType = False
 		else:
+			pr('OpenType not found!')
 			pass
 
 		if cur == '\n':
