@@ -1,14 +1,15 @@
 
-var test = function test (par) {
-	this.body = true;
+/**
+ * This is a testing function
+ * 
+ * @property   {String}   name   The name of this person
+ *
+ * @param      {String}   name   The name to give to this person
+ * @param      {Number}   age    The age of this person
+ */
+var Person = function Person(name, age) {
+
+	this.name = name;
+	this.age = age;
+
 }
-
-function zever(){
-	die();
-}
-
-functioncall();
-
-var a = 1+1;
-
-for(){a()}
