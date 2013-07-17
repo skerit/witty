@@ -12,6 +12,9 @@ var Person = function Person(name, age) {
 	this.name = name;
 	this.age = age;
 
+	/** db1 */
+	var dbtest, zever;
+
 	/**
 	 * test
 	 */

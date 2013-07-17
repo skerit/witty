@@ -598,7 +598,10 @@ def isValidName(char, beginOfName = False):
 	else:
 		return False
 
-
+## Extract the first string from the given text
+#  @param    text         The original text to use
+#  @param    literal      The literal to use (' or ")
+#  @param    id           The id position in the text to start from
 def extractString(text, literal, id = False):
 
 	if id > -1:
@@ -646,491 +649,7 @@ def extractString(text, literal, id = False):
 
 	return result, i, newLines
 
-def willExpressionContinue(text, id, hasBegun, waitingForOperand):
-
-	(text, exists) = shiftString(text, id)
-
-	if exists:
-		if not hasBegun:
-			return True
-
-		if waitingForOperand:
-			return True
-
-		(tempOperator, newId, tempLines) = extractOperatorAfter(text)
-
-		if tempOperator:
-			return True
-		else:
-			return False
-
-	# If it doesn't exists, the expression has ended
-	return False
-
-## If the next line is an expression, extract it
-#  @param   text       The text to start from
-#  @param   hasBegun   If we already now this is an expression
-#  @param   waitingForOperand   If we're waiting for an operand
-def extractExpression(text, hasBegun = False, waitingForOperand = False):
-
-	# The new lines we've encountered
-	newLines = 0
-
-	# Result
-	result = ''
-
-	# Skip
-	skipToId = False
-
-	operandBusy = False
-	docblockEnd = False
-
-	# Extra extractions
-	extras = []
-
-	# Loop through the text
-	for i, c in enumerate(text):
-
-		# Skip any characters we might have already added
-		if i < skipToId:
-			continue
-
-		if isWhitespace(c):
-			operandBusy = False
-
-		if hasOperatorNext(c):
-			operandBusy = False
-			waitingForOperand = True
-
-		if c == ';':
-			break
-
-		# Count newlines
-		if c == '\n':
-
-			opBefore = hasCharsBefore(text, i, operatorSymbols) or hasCharsBefore(text, i, operatorTokens)
-			opAfter = hasOperatorAfter(text, i)
-
-			if opBefore:
-				pass
-			elif opAfter:
-				pass
-			else:
-				break
-
-			newLines += 1
-
-			#willContinue = willExpressionContinue(text, i, hasBegun, waitingForOperand)
-
-			# If the expression has ended, break out!
-			#if not willContinue:
-			#	i -= 1
-			#	break
-
-
-		tempWord = False
-
-		if not operandBusy:
-			# Look for a statement
-			(tempWord, tempId, tempNewLines) = extractStatementAfter(text, i)
-
-		# A statement word was found
-		if tempWord:
-
-			if hasBegun and tempWord == 'function':
-				# Extract the function
-				(fncResult, fncId, fncNewlines) = function.extract(text, i)
-
-				extras.append(fncResult)
-
-				# This can't be added to the result
-				result += ' '
-
-				# Skip to the id after it
-				skipToId = i+fncId+1
-
-				# Up the newline count
-				newLines += fncNewlines
-
-				waitingForOperand = False
-
-				continue
-
-			else:
-				i -= 1
-				break
-		# If c is a starting paren
-		elif c == '(':
-
-			# Extract everything between the parens
-			(tempResult, tempEndId, tempNewLines) = extractParen(text[i:])
-
-			result += '(' + tempResult + ')'
-			skipToId = i+tempEndId+1
-			newLines += tempNewLines
-
-			hasBegun = True
-
-			waitingForOperand = False
-			
-			continue
-		elif hasCharsAfter(text, '/*', i):
-
-			docblockOpen = getNextCharId(text, '/*', i)
-			skip = getNextCharId(text, '*/', i)
-
-			if skip > -1:
-				skipToId = skip + 2
-				docblockEnd = skip + 1
-				continue
-			else:
-				break
-		# Skip inline comments
-		elif hasCharsAfter(text, '//', i):
-			
-			skip = getNextCharId(text, '\n', i)
-
-			if skip > -1:
-				skipToId = skip+1
-				continue
-			else:
-				break
-		# Extract literals
-		elif c in literals:
-
-			if c == "'" or c == '"':
-				(tempResult, tempId, tempNewLines) = extractString(text, c, i)
-
-				result += tempResult
-
-				skipToId = i+tempId+1
-				newLines += tempNewLines
-			elif c == '{':
-				(tempResult, tempEndId, tempNewLines) = extractCurly(text[i:])
-				result += '{' + tempResult + '}'
-				skipToId = i+tempEndId+1
-				newLines += tempNewLines
-			elif c == '[':
-				(tempResult, tempEndId, tempNewLines) = extractSquare(text[i:])
-				result += '[' + tempResult + ']'
-				skipToId = i+tempEndId+1
-				newLines += tempNewLines
-
-			waitingForOperand = False
-
-			continue
-			
-		else:
-			result += c
-			operandBusy = True
-			continue
-
-	# If the parsed text ends with a docblock, rewind the ending id
-	if docblockEnd:
-		tempText = text[:i].strip()
-
-		if tempText.endswith('*/'):
-			endId = docblockOpen
-		else:
-			endId = i
-	else:
-		endId = i
-
-	return {'text': result.strip(), 'functions': extras}, endId, newLines
-
-
-class LOC:
-
-	# Type
-	type = None
-
-	# Name
-	name = None
-
-	# The string that begins this LOC
-	begins = None
-
-	# The string that ends this LOC
-	ends = None
-
-	# If a begin is greedy, it does not
-	# care what comes after it
-	# (If it's a whole word or not)
-	greedy = None
-
-	# Naming things
-	namePosition = None
-	nameRequired = None
-
-	# Paren location
-	parenPosition = None
-	parenRequired = None
-
-	# Block location
-	blockPosition = None
-	blockRequired = None
-
-	# Is there an expression anywhere?
-	expressionPosition = None
-	expressionRequired = None
-
-	# Extra settings
-	extras = None
-
-	# If one "begins" can be used for
-	# multiple name-paren-block
-	grouping = None
-
-	def setBegin(self, string):
-		self.begins = string
-
-	def setEnd(self, string):
-		self.ends = string
-
-	def setGreedy(self, greedy):
-		self.greedy = greedy
-
-	def setName(self, order, required = False):
-		self.namePosition = order
-		self.nameRequired = required
-
-	def setParen(self, order, required = False):
-		self.parenPosition = order
-		self.parenRequired = required
-
-	def setBlock(self, order, required = False):
-		self.blockPosition = order
-		self.blockRequired = required
-
-	def setExpression(self, order, required = False):
-		self.expressionPosition = order
-		self.expressionRequired = required
-
-	def setGroup(self, delimiter):
-		self.grouping = delimiter
-
-	def setExtra(self, order, char, required = False, options = False):
-		self.extras[order] = {
-			'char': char,
-			'position': order,
-			'required': required,
-			'options': options
-		}
-
-
-	def getNextTarget(self, position):
-
-		if position in self.extras:
-			return self.extras[position]['char'], self.extras[position]['required'], self.extras[position]['options']
-		elif self.namePosition == position:
-			return 'name', self.nameRequired, False
-		elif self.parenPosition == position:
-			return 'paren', self.parenRequired, False
-		elif self.blockPosition == position:
-			return 'block', self.blockRequired, False
-		elif self.expressionPosition == position:
-			return 'expression', self.expressionRequired, False
-
-		return False, False, False
-
-
-	def extract(self, text, startId = 0):
-
-		a = datetime.datetime.now()
-
-		if text[0] in [' ', '\t', '\n']:
-			(result, newId, newLines) = self.extract(text[1:], 0)
-
-			if text[0] == '\n':
-				newLines += 1
-
-			return result, newId+1, newLines
-
-		if self.greedy:
-			(result, endId, newLines) = extractGreedy(text, self.begins, self.ends)
-			return result, endId+startId, newLines
-		else:
-
-			# Get the beginning
-			begin = self.begins
-
-			# Get the new current id
-			id = len(begin)
-
-			# Text length
-			textLength = len(text)
-
-			# Remove the beginning
-			rest = text[id:]
-
-			# Position
-			position = 0
-
-			# Start a new group?
-			startNewGroup = False
-
-			extractions = {'beginId': id}
-
-			groupResult = {'group': []}
-
-			# Has an expression already begun?
-			expressionHasBegun = False
-			waitingForOperand = False
-
-			# See what we have to do next
-			while True:
-
-				position += 1
-
-				# Have we reached the end of the string?
-				if id == textLength:
-					break
-				
-				if self.grouping and text[id] == self.grouping:
-
-					# Add the previous extractions to the group
-					groupResult['group'].append(extractions)
-
-					# Increase the id
-					id = id + 1
-
-					# Create a new extraction
-					extractions = {'beginId': id}
-
-					# Reset the position
-					position = 0
-					continue
-
-				(targetName, targetRequired, extraOptions) = self.getNextTarget(position)
-
-				if targetName == 'name':
-
-					(result, endId, newLines) = extractName(text[id:])
-
-					# Store the result in the extractions
-					extractions['name'] = {
-						'name': result,
-						'beginId': id,
-						'endId': id+endId
-					}
-
-					# Set the next Id
-					id = id+endId+1
-
-					# Get the new rest
-					rest = text[id:]
-
-				elif targetName == 'expression':
-
-					(result, endId, newLines) = extractExpression(text[id:], expressionHasBegun, waitingForOperand)
-
-					extractions['expression'] = {
-						'text': result['text'],
-						'beginId': id,
-						'endId': id+endId,
-						'functions': result['functions']
-					}
-
-					id = id+endId+1
-
-					expressionHasBegun = False
-					waitingForOperand = False
-
-					# Get the new rest
-					rest = text[id:]
-
-				elif targetName == 'paren':
-
-					(result, endId, newLines) = extractParen(rest)
-
-					# Store the result in the extractions
-					extractions['paren'] = {
-						'content': result,
-						'beginId': id,
-						'endId': id+endId
-					}
-
-					# Set the next Id
-					id = id+endId+1
-
-					# Get the new rest
-					rest = text[id:]
-
-				elif targetName == 'block':
-					(result, endId, newLines) = extractCurly(rest)
-
-					# If the result is empty, make sure it was because
-					# the block was empty
-					if not result:
-						
-						# If there is no block, get the first expression
-						if not hasCharsAfter(rest, '{'):
-							(result, endId, newLines) = extractExpression(rest, True, True)
-
-						pass
-
-					# Now parse these results, too!
-					parsedResults = splitStatements(result)
-
-
-					# Store the result in the extractions
-					extractions['block'] = {
-						'content': result,
-						'parsed': parsedResults,
-						'beginId': id,
-						'endId': id+endId
-					}
-
-					# Set the next Id
-					id = id+endId+1
-
-					pr(extractions)
-
-					# Get the new rest
-					rest = text[id:]
-				elif targetName:
-
-					if extraOptions == 'expressionHasBegun':
-						expressionHasBegun = True
-						waitingForOperand = True
-
-					# Get extra stuff
-					endId = getCharAfterId(text[id:], targetName)
-
-					if endId or endId > -1:
-						extractions[targetName] = {
-							'content': targetName,
-							'beginId': id,
-							'endId': id+endId
-						}
-						
-						# Set the next Id
-						id = id+endId+1
-
-						# Get the new rest
-						rest = text[id:]
-					else:
-						
-						if targetRequired:
-							break
-						else:
-							continue
-
-				else:
-					break
-
-			if self.grouping:
-				# Add the last result to the group
-				groupResult['group'].append(extractions)
-				result = groupResult['group']
-			else:
-				result = extractions
-
-		b = datetime.datetime.now()
-		c = b - a
-
-		return result, startId+id-1, newLines
-
+## Extract the next name from the given text
 def extractName(text):
 
 	# The new lines we've encountered
@@ -1325,6 +844,488 @@ def isWhitespace(char):
 	if isSpacing(char) or char == '\n':
 		return True
 
+def willExpressionContinue(text, id, hasBegun, waitingForOperand):
+
+	(text, exists) = shiftString(text, id)
+
+	if exists:
+		if not hasBegun:
+			return True
+
+		if waitingForOperand:
+			return True
+
+		(tempOperator, newId, tempLines) = extractOperatorAfter(text)
+
+		if tempOperator:
+			return True
+		else:
+			return False
+
+	# If it doesn't exists, the expression has ended
+	return False
+
+## If the next line is an expression, extract it
+#  @param   text       The text to start from
+#  @param   hasBegun   If we already now this is an expression
+#  @param   waitingForOperand   If we're waiting for an operand
+def extractExpression(text, hasBegun = False, waitingForOperand = False):
+
+	# The new lines we've encountered
+	newLines = 0
+
+	# Result
+	result = ''
+
+	# Skip
+	skipToId = False
+
+	operandBusy = False
+	docblockEnd = False
+	currentDocblock = False
+
+	# Extra extractions
+	extras = []
+
+	# Loop through the text
+	for i, c in enumerate(text):
+
+		# Skip any characters we might have already added
+		if i < skipToId:
+			continue
+
+		if isWhitespace(c):
+			operandBusy = False
+
+		if hasOperatorNext(c):
+			operandBusy = False
+			waitingForOperand = True
+
+		if c == ';':
+			break
+
+		# Count newlines
+		if c == '\n':
+
+			opBefore = hasCharsBefore(text, i, operatorSymbols) or hasCharsBefore(text, i, operatorTokens)
+			opAfter = hasOperatorAfter(text, i)
+
+			if opBefore:
+				pass
+			elif opAfter:
+				pass
+			else:
+				break
+
+			newLines += 1
+
+		tempWord = False
+
+		if not operandBusy:
+			# Look for a statement
+			(tempWord, tempId, tempNewLines) = extractStatementAfter(text, i)
+
+		# A statement word was found
+		if tempWord:
+
+			if hasBegun and tempWord == 'function':
+				# Extract the function
+				(fncResult, fncId, fncNewlines) = function.extract(text, i)
+
+				extras.append(fncResult)
+
+				# This can't be added to the result
+				result += ' '
+
+				# Skip to the id after it
+				skipToId = i+fncId+1
+
+				# Up the newline count
+				newLines += fncNewlines
+
+				waitingForOperand = False
+
+				continue
+
+			else:
+				i -= 1
+				break
+		# If c is a starting paren
+		elif c == '(':
+
+			# Extract everything between the parens
+			(tempResult, tempEndId, tempNewLines) = extractParen(text[i:])
+
+			result += '(' + tempResult + ')'
+			skipToId = i+tempEndId+1
+			newLines += tempNewLines
+
+			hasBegun = True
+
+			waitingForOperand = False
+			
+			continue
+		elif hasCharsAfter(text, '/*', i):
+
+			docblockOpen = getNextCharId(text, '/*', i)
+			skip = getNextCharId(text, '*/', i)
+
+			if skip > -1:
+				currentDocblock = text[i:skip+1]
+				skipToId = skip + 2
+				docblockEnd = skip + 1
+				continue
+			else:
+				break
+		# Skip inline comments
+		elif hasCharsAfter(text, '//', i):
+			
+			skip = getNextCharId(text, '\n', i)
+
+			if skip > -1:
+				skipToId = skip+1
+				continue
+			else:
+				break
+		# Extract literals
+		elif c in literals:
+
+			if c == "'" or c == '"':
+				(tempResult, tempId, tempNewLines) = extractString(text, c, i)
+
+				result += tempResult
+
+				skipToId = i+tempId+1
+				newLines += tempNewLines
+			elif c == '{':
+				(tempResult, tempEndId, tempNewLines) = extractCurly(text[i:])
+				result += '{' + tempResult + '}'
+				skipToId = i+tempEndId+1
+				newLines += tempNewLines
+			elif c == '[':
+				(tempResult, tempEndId, tempNewLines) = extractSquare(text[i:])
+				result += '[' + tempResult + ']'
+				skipToId = i+tempEndId+1
+				newLines += tempNewLines
+
+			waitingForOperand = False
+
+			continue
+			
+		else:
+			result += c
+			operandBusy = True
+			continue
+
+	# If the parsed text ends with a docblock, rewind the ending id
+	if docblockEnd:
+		tempText = text[:i].strip()
+
+		if tempText.endswith('*/'):
+			endId = docblockOpen
+		else:
+			endId = i
+	else:
+		endId = i
+
+	return {'text': result.strip(), 'functions': extras, 'docblock': currentDocblock}, endId, newLines
+
+
+class Statement:
+
+	# Type
+	type = None
+
+	# Name
+	name = None
+
+	# The string that begins this LOC
+	begins = None
+
+	# The string that ends this LOC
+	ends = None
+
+	# If a begin is greedy, it does not
+	# care what comes after it
+	# (If it's a whole word or not)
+	greedy = None
+
+	# Naming things
+	namePosition = None
+	nameRequired = None
+
+	# Paren location
+	parenPosition = None
+	parenRequired = None
+
+	# Block location
+	blockPosition = None
+	blockRequired = None
+
+	# Is there an expression anywhere?
+	expressionPosition = None
+	expressionRequired = None
+
+	# Extra settings
+	extras = None
+
+	# If one "begins" can be used for
+	# multiple name-paren-block
+	grouping = None
+
+	def __init__(self, name):
+		self.type = 'statement'
+		self.extras = {}
+		self.name = name
+		statements[name] = self
+
+	def setBegin(self, string):
+		self.begins = string
+
+	def setEnd(self, string):
+		self.ends = string
+
+	def setGreedy(self, greedy):
+		self.greedy = greedy
+
+	def setName(self, order, required = False):
+		self.namePosition = order
+		self.nameRequired = required
+
+	def setParen(self, order, required = False):
+		self.parenPosition = order
+		self.parenRequired = required
+
+	def setBlock(self, order, required = False):
+		self.blockPosition = order
+		self.blockRequired = required
+
+	def setExpression(self, order, required = False):
+		self.expressionPosition = order
+		self.expressionRequired = required
+
+	def setGroup(self, delimiter):
+		self.grouping = delimiter
+
+	def setExtra(self, order, char, required = False, options = False):
+		self.extras[order] = {
+			'char': char,
+			'position': order,
+			'required': required,
+			'options': options
+		}
+
+	def getNextTarget(self, position):
+
+		if position in self.extras:
+			return self.extras[position]['char'], self.extras[position]['required'], self.extras[position]['options']
+		elif self.namePosition == position:
+			return 'name', self.nameRequired, False
+		elif self.parenPosition == position:
+			return 'paren', self.parenRequired, False
+		elif self.blockPosition == position:
+			return 'block', self.blockRequired, False
+		elif self.expressionPosition == position:
+			return 'expression', self.expressionRequired, False
+
+		return False, False, False
+
+
+	def extract(self, text, startId = 0):
+
+		a = datetime.datetime.now()
+
+		if text[0] in [' ', '\t', '\n']:
+			(result, newId, newLines) = self.extract(text[1:], 0)
+
+			if text[0] == '\n':
+				newLines += 1
+
+			return result, newId+1, newLines
+
+		if self.greedy:
+			(result, endId, newLines) = extractGreedy(text, self.begins, self.ends)
+			return result, endId+startId, newLines
+		else:
+
+			# Get the beginning
+			begin = self.begins
+
+			# Get the new current id
+			id = len(begin)
+
+			# Text length
+			textLength = len(text)
+
+			# Remove the beginning
+			rest = text[id:]
+
+			# Position
+			position = 0
+
+			# Start a new group?
+			startNewGroup = False
+
+			extractions = {'beginId': id}
+
+			groupResult = {'group': []}
+
+			# Has an expression already begun?
+			expressionHasBegun = False
+			waitingForOperand = False
+
+			# See what we have to do next
+			while True:
+
+				position += 1
+
+				# Have we reached the end of the string?
+				if id == textLength:
+					break
+				
+				if self.grouping and text[id] == self.grouping:
+
+					# Add the previous extractions to the group
+					groupResult['group'].append(extractions)
+
+					# Increase the id
+					id = id + 1
+
+					# Create a new extraction
+					extractions = {'beginId': id}
+
+					# Reset the position
+					position = 0
+					continue
+
+				(targetName, targetRequired, extraOptions) = self.getNextTarget(position)
+
+				if targetName == 'name':
+
+					(result, endId, newLines) = extractName(text[id:])
+
+					# Store the result in the extractions
+					extractions['name'] = {
+						'name': result,
+						'beginId': id,
+						'endId': id+endId
+					}
+
+					# Set the next Id
+					id = id+endId+1
+
+					# Get the new rest
+					rest = text[id:]
+
+				elif targetName == 'expression':
+
+					(result, endId, newLines) = extractExpression(text[id:], expressionHasBegun, waitingForOperand)
+
+					extractions['expression'] = {
+						'text': result['text'],
+						'beginId': id,
+						'endId': id+endId,
+						'functions': result['functions']
+					}
+
+					id = id+endId+1
+
+					expressionHasBegun = False
+					waitingForOperand = False
+
+					# Get the new rest
+					rest = text[id:]
+
+				elif targetName == 'paren':
+
+					(result, endId, newLines) = extractParen(rest)
+
+					# Store the result in the extractions
+					extractions['paren'] = {
+						'content': result,
+						'beginId': id,
+						'endId': id+endId
+					}
+
+					# Set the next Id
+					id = id+endId+1
+
+					# Get the new rest
+					rest = text[id:]
+
+				elif targetName == 'block':
+					(result, endId, newLines) = extractCurly(rest)
+
+					# If the result is empty, make sure it was because
+					# the block was empty
+					if not result:
+						
+						# If there is no block, get the first expression
+						if not hasCharsAfter(rest, '{'):
+							(result, endId, newLines) = extractExpression(rest, True, True)
+
+						pass
+
+					# Now parse these results, too!
+					parsedResults = splitStatements(result)
+
+
+					# Store the result in the extractions
+					extractions['block'] = {
+						'content': result,
+						'parsed': parsedResults,
+						'beginId': id,
+						'endId': id+endId
+					}
+
+					# Set the next Id
+					id = id+endId+1
+
+					# Get the new rest
+					rest = text[id:]
+				elif targetName:
+
+					if extraOptions == 'expressionHasBegun':
+						expressionHasBegun = True
+						waitingForOperand = True
+
+					# Get extra stuff
+					endId = getCharAfterId(text[id:], targetName)
+
+					if endId or endId > -1:
+						extractions[targetName] = {
+							'content': targetName,
+							'beginId': id,
+							'endId': id+endId
+						}
+						
+						# Set the next Id
+						id = id+endId+1
+
+						# Get the new rest
+						rest = text[id:]
+					else:
+						
+						if targetRequired:
+							break
+						else:
+							continue
+
+				else:
+					break
+
+			if self.grouping:
+				# Add the last result to the group
+				groupResult['group'].append(extractions)
+				result = groupResult['group']
+			else:
+				result = extractions
+
+		b = datetime.datetime.now()
+		c = b - a
+
+		return result, startId+id-1, newLines
+
 # Get the next statement/expression
 def determineOpen(text, id):
 
@@ -1352,8 +1353,6 @@ def determineOpen(text, id):
 		return 'expression', 'expression', id, endId+id, result, newLines
 
 	return False, False, False, False, False, False
-
-
 
 def splitStatements(text):
 
@@ -1429,104 +1428,9 @@ def hasDeclaration(text):
 def getAssignmentVariables(text):
 	pass
 
-## We've split & joined the statements
-#  to the best of our abilities,
-#  now we need to normalize them some more
-def postNormalize(inputArray, recurse = False):
 
-	#if recurse:
-	#	print(inputArray)
-
-	# The results to return in the end
-	results = []
-
-	# The current group
-	group = []
-
-	# The current docblock
-	activeDocblock = False
-
-	# Are we in an open block?
-	openBlock = 0
-	openBlockBegin = False
-	recurseResult = []
-
-	# Default surround object
-	default = {'text': '', 'line': False, 'type': False}
-
-	for id, entry in enumerate(inputArray):
-
-		(prev, next) = getSurround(inputArray, id, default)
-
-		# Set the docblock if present
-		if entry['type'] == 'docblock':
-			next['docblock'] = entry['text']
-			continue
-		else:
-			next['docblock'] = False
-
-		# If the current entry opens a new block
-		if entry['type'] == 'openblock':
-			openBlock += 1
-
-			if openBlock == 1:
-				openBlockBegin = entry
-
-		# If the previous entry opened a block, reset the group
-		if prev['type'] == 'openblock':
-			if openBlock == 1:
-				if not entry['type'] == 'closeblock':
-					group = []
-
-		if entry['type'] == 'closeblock':
-			if openBlock > 0:
-				openBlock -= 1
-
-		# Add the current entry to the group
-		group.append(entry)
-
-		if openBlock == 1 and next['type'] == 'closeblock':
-			if recurse:
-				pr('>> ' + str(next))
-			if not recurse:
-				pr(next)
-
-			# If the next statement will close this block...
-			# Recursively add body statements to this one
-			openBlockBegin['body'] = postNormalize(group, True)
-
-			# Reset the group with the beginning line of the block
-			group = [openBlockBegin]
-			openBlockBegin = False
-
-		if not entry['type'] and not openBlock:
-			results.append(group)
-			group = []
-		elif not openBlock and entry['type'] == 'closeblock':
-			results.append(group)
-			group = []
-
-	if not recurse:
-		for x in results:
-			pass
-			pr(x)
-
-	return results
-
+# Place to store all the type of statements in
 statements = {}
-expressions = {}
-
-class Statement(LOC):
-
-	type = 'statement'
-
-	# Extra settings
-	extras = {}
-
-	def __init__(self, name):
-		self.extras = {}
-		self.name = name
-		statements[name] = self
 
 docblock = Statement('docblock')
 docblock.setBegin('/*')
