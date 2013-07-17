@@ -8,6 +8,40 @@ from decimal import *
 doDebug = False
 debugLevel = 1
 
+# Chars
+whitespace = [' ', '\n', '\t']
+
+# All the operators
+operators = ['+', '=', '-', '*', '/', '%', '<', '>', '~']
+
+operatorSymbols = [
+	'>>>=', '>>=', '<<=', '%=', '/=', '*=', '-=', '+=', '&=', '^=', '|=',   # Assignment
+	'==', '!=', '===', '!==', '>', '>=', '<', '<=', # Comparison
+	'%', '++', '--', '-', '+', # Arithmetic
+	'&', '|', '^', '~', '<<', '>>', '>>>', # Bitwise
+	'&&', '||', '!', # Logical
+	'?', ':', # Conditional
+	'.', '['  # Members
+	]
+
+operatorTokens = [
+	'delete', 'in', 'instanceof', 'new', 'typeof', 'void', 'yield'
+]
+
+operatorSymbols.sort(key=len, reverse=True)
+operatorTokens.sort(key=len, reverse=True)
+
+# Things that denote expressions
+expressionizers = ['+', '=', '-', '*', '/', '%', '<', '>', '~', '(', ',']
+
+# This list is far from finished, just for testing!
+wordDelim = [',', ' ', '\n', '\t', '(', ')', '{', '}', '[', ']']
+
+# Opening Statements
+statWords = ['if', 'do', 'while', 'for', 'var', 'try', 'let', 'else', 'case', 'throw', 'const', 'yield', 'continue', 'break', 'debugger', 'function']
+
+literals = ["'", '"', '{', '[']
+
 # Is something an array?
 def is_array(object):
 	return isinstance(object, (list, tuple))
@@ -22,17 +56,22 @@ pp = pprint.PrettyPrinter(indent=2)
 # Create a dictionary for open files
 openFiles = {}
 
-# Generate a hash
+## Generate a hash
+#  @param   data      The list with strings
 def generateHash(data):
+
 	# Prepare the project id hash
 	hashId = hashlib.md5()
 
 	# Loop through all the folders to generate a hash
-	for folderName in data:
-		hashId.update(folderName.encode('utf-8'))
+	for text in data:
+		hashId.update(text.encode('utf-8'))
 
 	return hashId.hexdigest()
 
+## Turn the given parameter into a dictionary
+#  @param   data   The data to turn into a dict
+#  @param   level  
 def dictify(data, level=0):
 
 	if level > 2:
@@ -63,7 +102,10 @@ def dictify(data, level=0):
 	except AttributeError:
 		return data
 
-# Log data to the given file in /dev/shm/ (memory fs)
+## Log data to the given file in /dev/shm/ (memory fs)
+#  @param   data        The data to write to the file
+#  @param   filename    The filename inside /dev/shm/
+#  @param   doDictify   Dictify the given data
 def log(data, filename='workfile', doDictify=False):
 
 	global openFiles
@@ -81,6 +123,9 @@ def log(data, filename='workfile', doDictify=False):
 	except AttributeError:
 		openFiles[filename].write('\n' + pp.pformat(data))
 
+## Colorize the following part of the string
+#  @param   t      The previous part of the string
+#  @param   c      The colour
 def color(t, c):
 	
 	# For sublime just use 'esc' to stand out
@@ -147,41 +192,8 @@ def pr(message, showStack = True, stackLevel = 2):
 	if debugLevel > 2:
 		echo(message, showStack, stackLevel)
 
-#
-# String manipulators / searchers
-#
-
-# Is the given file a javascript file?
-# Right now, it only checks for .js in the filename
-def isJavascriptFile(filename):
-	return '.js' in filename
-
-# Does this line contain a function declaration?
-def isFunctionDeclaration(text):
-	# If there is no function to be found, it definitely isn't one
-	if not text.count('function'):
-		return False
-
-	# 'function' appears somewhere, but how?
-
-	# Replace all strings with this placeholder
-	text = re.sub(reStrings, '"a"', text)
-
-	if text.count('function') > 0:
-		return True
-
-	return False
-
-# Is this line a function call? (Does it begin with one)
-def isFunctionCall(text):
-	match = reFnCallBegin.match(text)
-
-	if match:
-		return True
-	else:
-		return False
-
-# Get a better prefix
+## Get a better prefix (Sublime autocomplete)
+#  @param   text
 def getBetterPrefix(text):
 
 	# Get everything after these chars, in this order
@@ -197,6 +209,21 @@ def getBetterPrefix(text):
 			pass
 
 	return text
+
+# Is the given file a javascript file?
+# Right now, it only checks for .js in the filename
+def isJavascriptFile(filename):
+	return '.js' in filename
+
+## Is this line a function call? (Does it begin with one)
+#  @param   text   The text to identify
+def isFunctionCall(text):
+	match = reFnCallBegin.match(text)
+
+	if match:
+		return True
+	else:
+		return False
 
 ## Get the characters before, and after the id
 #  @param   text   The text
@@ -218,46 +245,12 @@ def getSurround(text, id, default = ''):
 
 	return previous, next
 
-# Chars
-whitespace = [' ', '\n', '\t']
-
-# All the operators
-operators = ['+', '=', '-', '*', '/', '%', '<', '>', '~']
-
-operatorSymbols = [
-	'>>>=', '>>=', '<<=', '%=', '/=', '*=', '-=', '+=', '&=', '^=', '|=',   # Assignment
-	'==', '!=', '===', '!==', '>', '>=', '<', '<=', # Comparison
-	'%', '++', '--', '-', '+', # Arithmetic
-	'&', '|', '^', '~', '<<', '>>', '>>>', # Bitwise
-	'&&', '||', '!', # Logical
-	'?', ':', # Conditional
-	'.', '['  # Members
-	]
-
-operatorTokens = [
-	'delete', 'in', 'instanceof', 'new', 'typeof', 'void', 'yield'
-]
-
-operatorSymbols.sort(key=len, reverse=True)
-operatorTokens.sort(key=len, reverse=True)
-
-# Things that denote expressions
-expressionizers = ['+', '=', '-', '*', '/', '%', '<', '>', '~', '(', ',']
-
-# This list is far from finished, just for testing!
-wordDelim = [',', ' ', '\n', '\t', '(', ')', '{', '}', '[', ']']
-
-# Opening Statements
-statWords = ['if', 'do', 'while', 'for', 'var', 'try', 'let', 'else', 'case', 'throw', 'const', 'yield', 'continue', 'break', 'debugger', 'function']
-
-literals = ["'", '"', '{', '[']
-
 def hasWordNext(text, word, id = False):
 	return _hasChars(text, word, id, False, False)
 
 # Look for chars directly after the given text, spaces first invalidate the result
 def hasCharsNext(text, word, id = False, checkForSpace = False):
-	return _hasChars(text, word, id, checkForSpace)
+	return _hasChars(text, word, id, False, not checkForSpace)
 
 def hasCharsAfter(text, word, id = False, ignoreEndWhitespace = True):
 	return _hasChars(text, word, id, True, ignoreEndWhitespace)
@@ -954,7 +947,8 @@ class LOC:
 			return result, newId+1, newLines
 
 		if self.greedy:
-			return extractGreedy(text, self.begins, self.ends)
+			(result, endId, newLines) = extractGreedy(text, self.begins, self.ends)
+			return result, endId+startId, newLines
 		else:
 
 			# Get the beginning
@@ -1075,9 +1069,14 @@ class LOC:
 
 						pass
 
+					# Now parse these results, too!
+					parsedResults = splitStatements(result)
+
+
 					# Store the result in the extractions
 					extractions['block'] = {
 						'content': result,
+						'parsed': parsedResults,
 						'beginId': id,
 						'endId': id+endId
 					}
@@ -1130,14 +1129,9 @@ class LOC:
 		b = datetime.datetime.now()
 		c = b - a
 
-		pr({'extracted': result, 'type': self.name})
-		pr('Extract took ' + str(c.microseconds) + ' microseconds, or ' + str(Decimal(c.microseconds/1000000).quantize(Decimal('.01'), rounding=ROUND_DOWN)) + ' seconds')
-
 		return result, startId+id-1, newLines
 
 def extractName(text):
-
-	pr({'ExtractName': text[:10]})
 
 	# The new lines we've encountered
 	newLines = 0
@@ -1178,8 +1172,6 @@ def extractName(text):
 
 	endId = i - 1
 
-	pr({'name': result, 'endid': endId})
-
 	return result, endId, newLines
 
 def extractParen(text):
@@ -1192,8 +1184,6 @@ def extractSquare(text):
 	return extractBetween(text, '[', ']')
 
 def extractBetween(text, open, close):
-
-	pr({'open': open, 'close': close, 'text': text})
 
 	# The new lines we've encountered
 	newLines = 0
@@ -1268,8 +1258,6 @@ def extractBetween(text, open, close):
 
 	endId = i
 
-	pr({'result': result, 'endid': endId})
-
 	return result, endId, newLines
 
 # Extract a greedy statement, one that does not care
@@ -1317,7 +1305,6 @@ def extractGreedy(text, begins, ends):
 				hasBegun = True
 		else:
 			if hasCharsNext(text, ends, i):
-				pr('ENDFOUND')
 				endAtId = i + (len(ends)-1)
 
 		if hasBegun:
@@ -1355,7 +1342,6 @@ def determineOpen(text, id):
 				return 'statement', name, id, endId, result, newLines
 		else:
 			if hasWordNext(text, stat.begins):
-				pr('A statement called ' + name + ' begins at ' + str(id))
 				result, endId, newLines = stat.extract(text, id)
 				return 'statement', name, id, endId, result, newLines
 
@@ -1412,15 +1398,15 @@ def splitStatements(text):
 
 					# If the endId is smaller than the id we risk an infinite loop
 					if endId < id:
-						pr('====================================')
-						pr('endId is smaller than current id, infinite loop!')
-						pr('====================================')
+						warn('====================================')
+						warn('endId is smaller than current id, infinite loop!')
+						warn('====================================')
 						break
 
 					id = endId
 					openType = False
 		else:
-			pr('OpenType not found!')
+			warn('OpenType not found!')
 			pass
 
 		if cur == '\n':
@@ -1428,10 +1414,7 @@ def splitStatements(text):
 
 		id += 1
 
-	pr('splitStatements has finished')
-
-	for r in results:
-		pr(r)
+	return results
 
 
 ## Does this line declare something by using var?

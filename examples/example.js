@@ -12,4 +12,15 @@ var Person = function Person(name, age) {
 	this.name = name;
 	this.age = age;
 
+	/**
+	 * test
+	 */
+	this.method = function() {
+		return 0;
+	}
+
+}
+
+var obj = {
+	test: 1
 }
