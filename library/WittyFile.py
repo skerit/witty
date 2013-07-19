@@ -66,7 +66,7 @@ class WittyFile:
 	def parseStatements(self, workingLines, docblocks, scopeId = 1):
 
 		# Turn the text into an array of line objects
-		workingLines = wf.splitStatements(workingLines)
+		workingLines = wf.splitStatements(workingLines, scopeId)
 
 		#pr(workingLines)
 		wf.log(workingLines, 'wittystats')
