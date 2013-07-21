@@ -27,3 +27,9 @@ var Person = function Person(name, age) {
 var obj = {
 	test: 1
 }
+
+var t = 1;
+
+var newScope = function() {
+	this.test = 1;
+}

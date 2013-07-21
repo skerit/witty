@@ -32,7 +32,7 @@ class WittyFile:
 		self.working = ''
 
 		# Create the statements
-		self.textStatements = []
+		self.splitStatements = []
 		self.statements = []
 
 		# Empty the blocks
@@ -48,105 +48,66 @@ class WittyFile:
 
 		self.root = {}
 
-		self.parse()
+		# Recursively split all the statements
+		self.splitStatements = wf.splitStatements(self.original, 1)
+
+		# Now process them
+		self.statements = self.parseStatements(self.splitStatements, 1)
+
+		wf.log(self.statements, 'wittytwo')
 
 		# Begin the second stage
 		#self.secondStage()
 
 		wf.log(self.scopes, 'scopes')
-		wf.log({fileName: self.textStatements, 'scopes': self.scopes})
-
-	## Start parsing the file
-	def parse(self):
-
-		# Recursively parse all the statements
-		self.textStatements = self.parseStatements(self.original, self.docblocks)
+		wf.log({fileName: self.splitStatements, 'scopes': self.scopes})
 
 	# Parsing statements begins here
-	def parseStatements(self, workingLines, docblocks, scopeId = 1):
+	def parseStatements(self, workingStatements, scopeId = 1):
 
-		# Turn the text into an array of line objects
-		workingLines = wf.splitStatements(workingLines, scopeId)
-
-		#pr(workingLines)
-		wf.log(workingLines, 'wittystats')
+		wf.log(workingStatements, 'wittystats')
 
 		statements = []
 
-		dbnow = False
-
-		# The running statement
-		s = {}
-
-		for lineObject in workingLines:
-
-			# If it's a docblock, keep it for the next statement!
-			if lineObject['typeName'] == 'docblock':
-				dbnow = lineObject['result']
-				continue
-
-			# Set the docblock
-			lineObject['docblock'] = dbnow
-			dbnow = False
-
-			# Set the scope id
-			lineObject['scopeId'] = scopeId
-
-			statements.append(lineObject)
-
-		previousStatement = None
-
-		for stat in statements:
-			#newStat = self.parseStat(stat, scopeId, previousStatement)
-
-			# Store this new statement as the previous statement,
-			# so we can pass it on next time
-			previousStatement = stat
-
-		wf.log(statements, 'wittytwo')
+		for stat in workingStatements:
+			statements.append(self.parseStatement(stat, scopeId))
 
 		return statements
 
-	## Find some additional information on a single line
+	## Parse the statement
 	#  @param   self                The object pointer
 	#  @param   statement           A primitive statement object
 	#  @param   scopeId             The id of the scope it's in (id in the file)
-	def parseStat(self, statement, scopeId, previousStatement):
+	def parseStatement(self, statement, scopeId, docblock = False):
 
-		# Guess what a line is all about
-		temp = self.guessLine(statement['line'][0], previousStatement)
+		statement['scopeId'] = scopeId
 
-		statement['insideBlock'] = blockType
+		if 'openType' in statement and statement['openType'] == 'statement':
 
-		# Append the line info to the statement
-		for name, value in temp.items():
-			statement[name] = value
+			# @todo: Here, we just pass the statement docblock to the expressions
+			docblock = statement['docblock']
 
-		# If the statement is a multiline, but we should NOT ignore the first new block
-		if not ignoreFirstNewBlock and statement['multiline']:
+			# Loop through all the results in this statement
+			for r in statement['result']:
+
+				# If there is an expression in this result
+				if 'expression' in r:
+					self.parseStatement(r['expression'], scopeId, docblock)
+
+		elif 'openType' in statement and statement['openType'] == 'expression':
+			# It's an expression
+
+			for f in statement['functions']:
+				# @todo: the statement docblock is currently the only docblock we store
+				# expressions can't have docblocks yet
+				self.parseStatement(f, self.createNewScope(statement['line'], scopeId, docblock))
+		
+		# Recursively parse block contents
+		if 'block' in statement:
 			
-			# We don't need a clone anymore
-			#temp = statement['line'][:]
+			for stat in statement['block']['parsed']:
+				self.parseStatement(stat, scopeId, docblock)
 
-			temp = statement['line']
-
-			# If this is a new function, everything under it is in a new scope
-			if statement['function']:
-
-				statement['subscope'] = self.parseStatements(temp, statement['docblocks'], self.createNewScope(temp[0], scopeId, statement['docblock']), 'function', True)
-			else:
-				newBlock = ''
-				temp = re.sub(' ', '', temp[0])
-				if temp.count('={'):
-					newBlock = 'object'
-				elif temp.count('if('):
-					newBlock = 'if'
-				elif temp.count('=['):
-					newBlock = 'array'
-				elif temp.count('switch'):
-					newBlock = 'switch'
-
-				statement['subblock'] = self.parseStatements(temp, statement['docblocks'], scopeId, newBlock, True)
 		
 		return statement
 
