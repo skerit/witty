@@ -669,8 +669,9 @@ def extractName(text):
 		# If the name hasn't begun yet
 		if not hasBegun:
 
-			# Skip spaces
-			if isSpacing(c):
+			# Skip all whitespaces
+			# Even though it isn't always allowed
+			if isWhitespace(c):
 				continue
 
 			# See if it's a valid start
@@ -781,7 +782,18 @@ def extractBetween(text, open, close):
 
 # Extract a greedy statement, one that does not care
 # what comes between begin and end char, like /* */
-def extractGreedy(text, begins, ends):
+def extractGreedy(text, begins, ends, skipBeginSpaces = False):
+
+	if skipBeginSpaces:
+		if isWhitespace(text[0]):
+
+			nl = 0
+			if text[0] == '\n':
+				nl =1
+
+			(result, endId, newLines) = extractGreedy(text[1:], begins, ends, True)
+			return result, endId+1, newLines+nl
+
 
 	# The new lines we've encountered
 	newLines = 0
@@ -822,9 +834,11 @@ def extractGreedy(text, begins, ends):
 			if text.startswith(begins):
 				includeToId = len(begins) - 1
 				hasBegun = True
-		else:
+		elif hasBegun:
 			if hasCharsNext(text, ends, i):
 				endAtId = i + (len(ends)-1)
+		else:
+			break
 
 		if hasBegun:
 			result += c
@@ -906,6 +920,10 @@ def extractExpression(text, scopeLevel, lineNr, currentId, startId = 0, hasBegun
 			waitingForOperand = True
 
 		if c == ';':
+			break
+
+		if c == ',':
+			i -= 1
 			break
 
 		# Count newlines
@@ -1208,7 +1226,7 @@ class Statement:
 			# Start a new group?
 			startNewGroup = False
 
-			extractions = {'beginId': id}
+			extractions = {'beginId': id, 'docblock': False}
 
 			groupResult = {'group': []}
 
@@ -1216,14 +1234,28 @@ class Statement:
 			expressionHasBegun = False
 			waitingForOperand = False
 
+			# Have we found a docblock in the mean time?
+			foundDocblock = False
+
 			# See what we have to do next
 			while True:
-
-				position += 1
 
 				# Have we reached the end of the string?
 				if id >= textLength:
 					break
+
+				# Extract any docblocks in here
+				(dbResult, dbEndId, dbNewLines) = extractGreedy(text[id:], '/*', '*/', True)
+
+				if dbResult:
+					foundDocblock = dbResult
+					id += dbEndId+1
+					newLines += dbNewLines
+					if not extractions['docblock']:
+						extractions['docblock'] = foundDocblock
+					continue
+
+				position += 1
 				
 				if self.grouping and text[id] == self.grouping:
 
@@ -1234,7 +1266,7 @@ class Statement:
 					id = id + 1
 
 					# Create a new extraction
-					extractions = {'beginId': id}
+					extractions = {'beginId': id, 'docblock': False}
 
 					# Reset the position
 					position = 0
@@ -1250,7 +1282,8 @@ class Statement:
 					extractions['name'] = {
 						'name': result,
 						'beginId': id,
-						'endId': id+endId
+						'endId': id+endId,
+						'docblock': foundDocblock
 					}
 
 					# Set the next Id
@@ -1266,6 +1299,8 @@ class Statement:
 
 					# Get the newLines
 					newLines = result['newLines']
+
+					result['docblock'] = foundDocblock
 
 					extractions['expression'] = result
 
@@ -1285,7 +1320,8 @@ class Statement:
 					extractions['paren'] = {
 						'content': result,
 						'beginId': id,
-						'endId': id+endId
+						'endId': id+endId,
+						'docblock': foundDocblock
 					}
 
 					# Set the next Id
@@ -1341,7 +1377,8 @@ class Statement:
 						extractions[targetName] = {
 							'content': targetName,
 							'beginId': id,
-							'endId': id+endId
+							'endId': id+endId,
+							'docblock': foundDocblock
 						}
 						
 						# Set the next Id
@@ -1358,6 +1395,8 @@ class Statement:
 
 				else:
 					break
+
+				foundDocblock = False
 
 			if self.grouping:
 				# Add the last result to the group

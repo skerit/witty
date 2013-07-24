@@ -49,18 +49,17 @@ class WittyFile:
 		self.root = {}
 
 		# Recursively split all the statements
-		self.splitStatements = wf.splitStatements(self.original, 1)
+		splitStatements = wf.splitStatements(self.original, 1)
+		self.objStatements = self.parseStatements(splitStatements, 1)
 
-		# Now process them
-		self.statements = self.parseStatements(self.splitStatements, 1)
+		wf.log(self.scopes, 'scopes')
+		wf.log({fileName: splitStatements, 'scopes': self.scopes})
+
+		# Now turn them into objects
+		self.processStatements()
 
 		wf.log(self.statements, 'wittytwo')
 
-		# Begin the second stage
-		#self.secondStage()
-
-		wf.log(self.scopes, 'scopes')
-		wf.log({fileName: self.splitStatements, 'scopes': self.scopes})
 
 	# Parsing statements begins here
 	def parseStatements(self, workingStatements, scopeId = 1):
@@ -87,12 +86,20 @@ class WittyFile:
 			# @todo: Here, we just pass the statement docblock to the expressions
 			docblock = statement['docblock']
 
+			resultCount = 0
+
 			# Loop through all the results in this statement
 			for r in statement['result']:
+
+				# Add the docblock tot he first result, if it doesn't have one already
+				if resultCount == 0 and docblock and not r['docblock']:
+					r['docblock'] = docblock
 
 				# If there is an expression in this result
 				if 'expression' in r:
 					self.parseStatement(r['expression'], scopeId, docblock)
+
+				resultCount += 1
 
 		elif 'openType' in statement and statement['openType'] == 'expression':
 			# It's an expression
@@ -112,25 +119,26 @@ class WittyFile:
 		return statement
 
 	# All the statements have been parsed, now we'll objectify them
-	def secondStage(self):
+	def processStatements(self):
 
 		results = []
 
 		# Recursively go through all the statements in this file
-		self.recurseStatObj(self.textStatements)
+		for stat in statements:
+			WittyStatement(self.scopes, self.fileName, stat, self.statements, parentStatement)
 
 		# Now do all the scope docblocks
-		for scope in self.scopes:
-			docblock = Docblock(self.scopeDocBlocks[scope['id']])
+		# for scope in self.scopes:
+		# 	docblock = Docblock(self.scopeDocBlocks[scope['id']])
 
-			# @todo: properties!
-			properties = docblock.getProperties()
+		# 	# @todo: properties!
+		# 	properties = docblock.getProperties()
 
-			# params
-			params = docblock.getParams()
+		# 	# params
+		# 	params = docblock.getParams()
 
-			for pName, pValue in params.items():
-				scope['variables'][pName] = pValue
+		# 	for pName, pValue in params.items():
+		# 		scope['variables'][pName] = pValue
 
 	# Create a new scope, return its ID
 	def createNewScope(self, name, parentScope, docBlock = ''):
@@ -148,8 +156,10 @@ class WittyFile:
 
 		return newId
 
-	def recurseStatObj(self, statements, parentStatement = False):
+	# Deprecated
+	def processStatement(self, statements, parentStatement = False):
 		for stat in statements:
+
 			# Create a Statement instance
 			tempObject = WittyStatement(self.scopes, self.fileName, stat, parentStatement)
 
@@ -159,11 +169,14 @@ class WittyFile:
 			wf.log(tempObject, 'statements')
 
 			# Now recursively do the subblocks and subscopes
-			if 'subscope' in stat:
-				self.recurseStatObj(stat['subscope'], tempObject)
+			if stat['openName'] == 'var':
 
-			if 'subblock' in stat:
-				self.recurseStatObj(stat['subblock'], tempObject)
+				# Go over every resultset
+				#for resultObj in stat['result']:
+				pass
+
+			elif 'block' in stat['result']:
+				self.processStatement(stat['result']['block']['parsed'], tempObject)
 
 	## Guess what a statement does (assignment or expression) and to what variables
 	#  @param   self               The object pointer

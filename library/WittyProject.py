@@ -272,6 +272,7 @@ class Intel:
 			scopeMap = {1: fileScope}
 
 			print('there are ' + str(len(wittyFile.scopes)) + ' scopes')
+			pr(wittyFile.scopes)
 
 			# Loop over every scope
 			for scope in wittyFile.scopes:
@@ -293,6 +294,7 @@ class Intel:
 
 			for statement in wittyFile.statements:
 				# Get the statement's scope
+				pr(statement)
 				statementScope = scopeMap[statement.scopeId]
 				statementScope.addVariable(statement)
 

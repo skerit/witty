@@ -8,14 +8,14 @@ def pr(message, showStack = True): wf.pr(message, showStack, 3)
 
 class WittyStatement:
 
-	def __init__(self, scopes, filename, obj, parentStatement = False):
+	def __init__(self, scopes, filename, obj, statementCollection, parentStatement = False):
+
+		statementCollection.append(self)
 		
 		statement = obj
 
-		thisScope = scopes[obj['scope']]
-
-		# The original line
-		self.line = obj['line']
+		# The original line nr
+		self.lineNr = obj['line']
 
 		# The parent statement (the block this is a part of)
 		self.parent = parentStatement
@@ -27,13 +27,13 @@ class WittyStatement:
 		self.docblock = Docblock(obj['docblock'])
 
 		# The type of this statement (assignment or expression)
-		self.type = obj['type']
+		self.type = obj['openType']
 
-		# The blocktype this statement is in (function, if, switch, ...)
-		self.insideBlock = obj['insideBlock']
+		# The type name
+		self.typeName = obj['openName']
 
 		# The scope id
-		self.scopeId = obj['scope']
+		self.scopeId = obj['scopeId']
 
 		# The scope
 		self.scope = scopes[self.scopeId]
@@ -48,15 +48,10 @@ class WittyStatement:
 		self.variables = {}
 
 		# If the variable has been declared
-		# @todo: This will unfortunately be false if a multiline var is used!
-		self.declaration = obj['declaration']
+		self.declaration = self.typeName == 'var'
 
 		# If the statement is a function
-		self.function = obj['function']
-
-		# The value is everything before the first semicolon
-		# If something else comes after that: tough luck
-		self.assignee = obj['value'].split(";")[0].strip()
+		self.function = self.typeName == 'function'
 
 		# Get this statement name, if any
 		self.name = self.docblock.getName()
