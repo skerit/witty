@@ -35,11 +35,6 @@ class WittyVariable:
 	#  @param   name        The name of the variable
 	def setName(self, name):
 
-		match = wf.reValidNameWithPoints.match(name)
-
-		if not match:
-			raise Exception('This is not a valid variable name!')
-
 		self.name = name
 
 	## Set the scope

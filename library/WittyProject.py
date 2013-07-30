@@ -160,6 +160,8 @@ class WittyProject:
 
 			info('Scope "' + function_scope + '" in file ' + current_file + ' was not found')
 
+			wittyOnly = True
+
 			if wittyOnly:
 				# We only want witty results, so make sure sublime doesn't interfere
 				return ([], sublime.INHIBIT_WORD_COMPLETIONS)
@@ -192,6 +194,9 @@ class WittyProject:
 		info('Unpickling project ' + str(self.id) + ' data')
 
 		data = {}
+
+		# @todo: reenable pickling
+		return data
 
 		# Load in existing completions previously stored
 		try:
@@ -349,7 +354,9 @@ class Intel:
 			wf.warn('File "' + filename + '" was not found while looking for scope "' + scopename + '"')
 			return False
 		else:
+			pr('Filename scopes:')
 			for scope in self.scopesByFilename[filename]:
+				pr(scope.__dict__)
 				if scope.name == scopename:
 					return scope
 

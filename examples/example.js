@@ -17,3 +17,12 @@ var multiline = 1,
 	 * @type {Number}
 	 */
     go;
+
+
+function TEST () {
+
+	var a = 1;
+
+	
+}
+

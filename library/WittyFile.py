@@ -54,11 +54,14 @@ class WittyFile:
 
 		wf.log(self.scopes, 'scopes')
 		wf.log({fileName: splitStatements, 'scopes': self.scopes})
+		wf.log(self.objStatements, 'witty-objstatements')
 
-		# Now turn them into objects
-		self.processStatements()
+		# Recursively go through all the statements in this file
+		for stat in self.objStatements:
+			WittyStatement(self, stat)
 
-		wf.log(self.statements, 'wittytwo')
+		for s in self.statements:
+			wf.log(s, 'witty-statements')
 
 
 	# Parsing statements begins here
@@ -88,6 +91,9 @@ class WittyFile:
 
 			resultCount = 0
 
+			if not isinstance(statement['result'], list):
+				statement['result'] = [statement['result']]
+
 			# Loop through all the results in this statement
 			for r in statement['result']:
 
@@ -99,7 +105,13 @@ class WittyFile:
 				if 'expression' in r:
 					self.parseStatement(r['expression'], scopeId, docblock)
 
+				# Parse block content
+				if 'block' in r:
+					for stat in r['block']['parsed']:
+						self.parseStatement(stat, scopeId, docblock)
+
 				resultCount += 1
+
 
 		elif 'openType' in statement and statement['openType'] == 'expression':
 			# It's an expression
@@ -118,28 +130,6 @@ class WittyFile:
 		
 		return statement
 
-	# All the statements have been parsed, now we'll objectify them
-	def processStatements(self):
-
-		results = []
-
-		# Recursively go through all the statements in this file
-		for stat in statements:
-			WittyStatement(self.scopes, self.fileName, stat, self.statements, parentStatement)
-
-		# Now do all the scope docblocks
-		# for scope in self.scopes:
-		# 	docblock = Docblock(self.scopeDocBlocks[scope['id']])
-
-		# 	# @todo: properties!
-		# 	properties = docblock.getProperties()
-
-		# 	# params
-		# 	params = docblock.getParams()
-
-		# 	for pName, pValue in params.items():
-		# 		scope['variables'][pName] = pValue
-
 	# Create a new scope, return its ID
 	def createNewScope(self, name, parentScope, docBlock = ''):
 		newId = len(self.scopes)
@@ -155,120 +145,3 @@ class WittyFile:
 			workingScope = self.scopes[workingScope['parent']]
 
 		return newId
-
-	# Deprecated
-	def processStatement(self, statements, parentStatement = False):
-		for stat in statements:
-
-			# Create a Statement instance
-			tempObject = WittyStatement(self.scopes, self.fileName, stat, parentStatement)
-
-			# Append it to the statements array
-			self.statements.append(tempObject)
-
-			wf.log(tempObject, 'statements')
-
-			# Now recursively do the subblocks and subscopes
-			if stat['openName'] == 'var':
-
-				# Go over every resultset
-				#for resultObj in stat['result']:
-				pass
-
-			elif 'block' in stat['result']:
-				self.processStatement(stat['result']['block']['parsed'], tempObject)
-
-	## Guess what a statement does (assignment or expression) and to what variables
-	#  @param   self               The object pointer
-	#  @param   text               The text to guess
-	#  @param   previousStatement  The previous statement (instance of WittyStatement)
-	def guessLine(self, text, previousStatement):
-		result = {'type': 'expression', 'variables': [], 'function': False, 'value': '', 'info': {}, 'declaration': False}
-
-		text = re.sub('!==', '', text)
-		text = re.sub('!=', '', text)
-
-		eqs = text.count('=')
-
-		result['function'] = wf.isFunctionDeclaration(text)
-
-		# If there are no equal signs, it could be an expression by default
-		if text.count('var ') == 0 and eqs == 0:
-
-			# See if it's a named function...
-			if result['function']:
-
-				# Get the function name, if it has one
-				match = wf.reFnName.match(text)
-
-				if match and match.group(1):
-
-					result['info']['name'] = match.group(1)
-
-					# If this line is NOT a function call (so the given function is not a parameter)
-					if not wf.isFunctionCall(text):
-						result['type'] = 'assignment'
-						result['variables'].append(match.group(1))
-						result['declaration'] = True
-
-		else:
-			# Count the equal signs part of comparisons
-			comparisons = text.count('===') * 3
-
-			# Remove the triple equals
-			temp = re.sub('===', '', text)
-
-			# Count the equals
-			comparisons += temp.count('==') * 2
-			
-			# If all the equal signs are part of comparisons, return the result
-			# @todo: equal signs part of a string will throw this of!
-			if not eqs == comparisons:
-
-				temp = text
-
-				if temp.count('var '):
-					result['declaration'] = True
-					# Replace possible 'var' text
-					temp = re.sub('var ', '', temp)
-				else:
-					# Maybe this is a multiline declaration?
-					if previousStatement and previousStatement['declaration'] and previousStatement['line'][0].strip().endswith(','):
-						result['declaration'] = True
-
-
-				# Split the value we're assigning of
-				split = temp.rsplit('=', 1)
-
-				# Replace all strings so there are no more ' or "
-				temp = re.sub(wf.reStrings, '__WITTY_STRING__', temp)
-
-				# Split them by the comma
-				declarations = temp.rsplit(',')
-
-				for dec in declarations:
-					dec = dec.strip()
-					dec = dec.split('=')
-					
-					varName = dec[0].strip()
-
-					try:
-						assignment = dec[1].strip()
-					except IndexError:
-						assignment = ''
-					
-					# If dec is an empty string, continue
-					if not dec:
-						continue
-
-					#print('Found: ' + varName + ' assigned with ' + assignment)
-
-					result['variables'].append(varName)
-
-					# @todo: since we can have multiple declarations per line, this needs to move!
-					result['value'] = ''
-
-					# @todo: same with this!
-					result['type'] = 'assignment'
-
-		return result

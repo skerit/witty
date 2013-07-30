@@ -31,6 +31,10 @@ operatorTokens = [
 operatorSymbols.sort(key=len, reverse=True)
 operatorTokens.sort(key=len, reverse=True)
 
+# Find strings (even with escaped ' and ")
+# Regex is actually (?<!\\)(?:(')|")(?(1)(\\'|[^'\r])+?'|(\\"|[^\r"])+?")
+reStrings = re.compile(r'''(?<!\\)(?:(')|")(?(1)(\\'|[^'\r])+?'|(\\"|[^\r"])+?")''', re.M|re.X)
+
 # Things that denote expressions
 expressionizers = ['+', '=', '-', '*', '/', '%', '<', '>', '~', '(', ',']
 
@@ -113,15 +117,14 @@ def log(data, filename='workfile', doDictify=False):
 	if not filename in openFiles:
 		openFiles[filename] = open('/dev/shm/' + filename, 'w')
 
-	try:
-		if doDictify:
-			data = dictify(data)
-		else:
-			data = data.__dict__
+	if doDictify:
+		data = dictify(data)
+	elif hasattr(data, '__dict__'):
+		data = data.__dict__
 
-		openFiles[filename].write('\n' + pp.pformat(data)) # data.__dict__
-	except AttributeError:
-		openFiles[filename].write('\n' + pp.pformat(data))
+	openFiles[filename].write('\n' + pp.pformat(data))
+	openFiles[filename].flush()
+	
 
 ## Colorize the following part of the string
 #  @param   t      The previous part of the string
@@ -224,6 +227,22 @@ def isFunctionCall(text):
 		return True
 	else:
 		return False
+
+# Does this line contain a function declaration?
+def isFunctionDeclaration(text):
+	# If there is no function to be found, it definitely isn't one
+	if not text.count('function'):
+		return False
+
+	# 'function' appears somewhere, but how?
+
+	# Replace all strings with this placeholder
+	text = re.sub(reStrings, '"a"', text)
+
+	if text.count('function') > 0:
+		return True
+
+	return False
 
 ## Get the characters before, and after the id
 #  @param   text   The text
@@ -784,6 +803,9 @@ def extractBetween(text, open, close):
 # what comes between begin and end char, like /* */
 def extractGreedy(text, begins, ends, skipBeginSpaces = False):
 
+	if not len(text):
+		return False, False, False
+
 	if skipBeginSpaces:
 		if isWhitespace(text[0]):
 
@@ -886,8 +908,6 @@ def willExpressionContinue(text, id, hasBegun, waitingForOperand):
 def extractExpression(text, scopeLevel, lineNr, currentId, startId = 0, hasBegun = False, waitingForOperand = False):
 
 	(text, exists) = shiftString(text, startId)
-
-	pr({'text': text})
 
 	# The new lines we've encountered
 	newLines = 0
@@ -1059,11 +1079,7 @@ def extractExpression(text, scopeLevel, lineNr, currentId, startId = 0, hasBegun
 	else:
 		endId = i
 
-	pr({'REST': text[endId:]})
-
 	endId += currentId + startId
-
-	pr({'REST2': endId})
 
 	result = {'text': result.strip(), 'functions': extras, 'docblock': currentDocblock, 'scope': scopeLevel}
 
@@ -1408,7 +1424,6 @@ class Statement:
 		b = datetime.datetime.now()
 		c = b - a
 
-		pr('...')
 		return {'scope': scopeLevel, 'line': lineNr, 'newLines': newLines, 'openType': 'statement', 'openName': self.name, 'result': result, 'beginId': beginId, 'endId': beginId+id-1}
 
 # Get the next statement/expression
@@ -1424,19 +1439,16 @@ def determineOpen(text, scopeLevel, lineNr, id):
 		# Strict means we don't care what comes after the opening tag
 		if stat.greedy:
 			if text.startswith(stat.begins):
-				pr('greed')
 				return stat.extract(text, scopeLevel, lineNr, id)
 				#result, endId, newLines = stat.extract(text, scopeLevel, id)
 				#return 'statement', name, id, endId, result, newLines
 		else:
 			if hasWordNext(text, stat.begins):
-				pr('nongreed')
 				return stat.extract(text, scopeLevel, lineNr, id)
 				#result, endId, newLines = stat.extract(text, scopeLevel, id)
 				#return 'statement', name, id, endId, result, newLines
 
 	# It wasn't a statement, so try getting the expression
-	pr("express")
 	return extractExpression(text, scopeLevel, lineNr, id, 0)
 	#(result, endId, newLines) = extractExpression(text, scopeLevel)
 
@@ -1468,8 +1480,6 @@ def splitStatements(text, scopeLevel, lineNr = 1):
 
 		# Get the current char
 		cur = text[id]
-
-		pr('>>> (' + str(scopeLevel) + ') Getting id ' + str(id) + ' on linenr ' + str(lineNr))
 
 		if not isWhitespace(cur):
 			

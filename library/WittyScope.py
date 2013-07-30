@@ -181,15 +181,10 @@ class WittyScope:
 			return
 
 		# Has this variable been declared inside this scope?
-		declared = statement.declaration
+		declared = variable['declared']
 
 		# Is there an existing variable in upper scopes?
 		existingVar = None
-
-		match = wf.reValidNameWithPoints.match(variable['name'])
-
-		if not match:
-			return
 
 		# The scope to use later on (self by default)
 		useScope = self
