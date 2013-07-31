@@ -25,6 +25,9 @@ class WittyFile:
 		# Read in the original file
 		self.original = fileHandle.read()
 
+		# The array
+		self.fileArray = self.original.split('\n')
+
 		# Close the file
 		fileHandle.close()
 
@@ -83,6 +86,7 @@ class WittyFile:
 	def parseStatement(self, statement, scopeId, docblock = False):
 
 		statement['scopeId'] = scopeId
+		statement['line'] = self.original.count('\n', 0, statement['beginId']) + 1
 
 		if 'openType' in statement and statement['openType'] == 'statement':
 
@@ -93,6 +97,7 @@ class WittyFile:
 
 			if not isinstance(statement['result'], list):
 				statement['result'] = [statement['result']]
+
 
 			# Loop through all the results in this statement
 			for r in statement['result']:
@@ -107,8 +112,15 @@ class WittyFile:
 
 				# Parse block content
 				if 'block' in r:
-					for stat in r['block']['parsed']:
-						self.parseStatement(stat, scopeId, docblock)
+
+					if statement['openName'] == 'function':
+						newScope = self.createNewScope(statement['line'], scopeId, docblock)
+						statement['subscopeId'] = newScope
+						for stat in r['block']['parsed']:
+							self.parseStatement(stat, newScope)
+					else:
+						for stat in r['block']['parsed']:
+							self.parseStatement(stat, scopeId, docblock)
 
 				resultCount += 1
 
@@ -130,9 +142,26 @@ class WittyFile:
 		
 		return statement
 
+	def getFileLine(self, linenr):
+		try:
+			return self.fileArray[linenr]
+		except IndexError:
+			return False
+
 	# Create a new scope, return its ID
 	def createNewScope(self, name, parentScope, docBlock = ''):
 		newId = len(self.scopes)
+
+		if isinstance(name, int):
+			name = self.getFileLine(name)
+			if name:
+				name = name.strip()
+			else:
+				name = 'ERROR'
+		
+		pr('SCOPE')
+		pr(name)
+
 		self.scopes.append({'id': newId, 'name': name, 'parent': parentScope, 'variables': {}, 'level': 0})
 
 		self.scopeDocBlocks[newId] = docBlock

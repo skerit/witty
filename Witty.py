@@ -85,7 +85,7 @@ class WittyCommand(sublime_plugin.EventListener):
 		if projectId in self.allProjects:
 			return self.allProjects[projectId]
 		else:
-			return False
+			return ''
 
 
 	# After saving a file, reparse it

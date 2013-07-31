@@ -742,6 +742,9 @@ def extractBetween(text, open, close):
 	# Between is open
 	isOpen = False
 
+	# Where we started extracting
+	beginId = 0
+
 	for i, c in enumerate(text):
 
 		# Count newlines
@@ -769,6 +772,7 @@ def extractBetween(text, open, close):
 			if isWhitespace(c):
 				continue
 			elif c == open:
+				beginId = i
 				isOpen = True
 				betweenOpen = 1
 				#result += c # Do not add the opener!
@@ -797,7 +801,7 @@ def extractBetween(text, open, close):
 
 	endId = i
 
-	return result, endId, newLines
+	return result, beginId, endId, newLines
 
 # Extract a greedy statement, one that does not care
 # what comes between begin and end char, like /* */
@@ -1005,7 +1009,7 @@ def extractExpression(text, scopeLevel, lineNr, currentId, startId = 0, hasBegun
 		elif c == '(':
 
 			# Extract everything between the parens
-			(tempResult, tempEndId, tempNewLines) = extractParen(text[i:])
+			(tempResult, tempBeginId, tempEndId, tempNewLines) = extractParen(text[i:])
 
 			result += '(' + tempResult + ')'
 			skipToId = i+tempEndId+1
@@ -1049,12 +1053,12 @@ def extractExpression(text, scopeLevel, lineNr, currentId, startId = 0, hasBegun
 				skipToId = i+tempId+1
 				newLines += tempNewLines
 			elif c == '{':
-				(tempResult, tempEndId, tempNewLines) = extractCurly(text[i:])
+				(tempResult, tempBeginId, tempEndId, tempNewLines) = extractCurly(text[i:])
 				result += '{' + tempResult + '}'
 				skipToId = i+tempEndId+1
 				newLines += tempNewLines
 			elif c == '[':
-				(tempResult, tempEndId, tempNewLines) = extractSquare(text[i:])
+				(tempResult, tempBeginId, tempEndId, tempNewLines) = extractSquare(text[i:])
 				result += '[' + tempResult + ']'
 				skipToId = i+tempEndId+1
 				newLines += tempNewLines
@@ -1211,6 +1215,9 @@ class Statement:
 
 		# The actual id where this statement starts
 		beginId = currentId + startId
+		extraId = currentId + startId
+
+		startScope = scopeLevel
 
 		# If this statement has scope...
 		if self.scope:
@@ -1242,7 +1249,7 @@ class Statement:
 			# Start a new group?
 			startNewGroup = False
 
-			extractions = {'beginId': id, 'docblock': False}
+			extractions = {'beginId': id+beginId, 'docblock': False}
 
 			groupResult = {'group': []}
 
@@ -1282,7 +1289,7 @@ class Statement:
 					id = id + 1
 
 					# Create a new extraction
-					extractions = {'beginId': id, 'docblock': False}
+					extractions = {'beginId': id+beginId, 'docblock': False}
 
 					# Reset the position
 					position = 0
@@ -1292,18 +1299,21 @@ class Statement:
 
 				if targetName == 'name':
 
-					(result, endId, newLines) = extractName(text[id:])
+					(result, endId, tempLines) = extractName(text[id:])
 
 					# Store the result in the extractions
 					extractions['name'] = {
 						'name': result,
-						'beginId': id,
-						'endId': id+endId,
+						'beginId': id+beginId,
+						'endId': id+beginId+endId,
 						'docblock': foundDocblock
 					}
 
 					# Set the next Id
 					id = id+endId+1
+
+					# Increase the newlines
+					newLines += tempLines
 
 					# Get the new rest
 					rest = text[id:]
@@ -1313,8 +1323,8 @@ class Statement:
 					#(result, endId, newLines) = extractExpression(text, scopeLevel, lineNr+newLines, id, expressionHasBegun, waitingForOperand)
 					result = extractExpression(text, scopeLevel, lineNr, beginId, id, expressionHasBegun, waitingForOperand)
 
-					# Get the newLines
-					newLines = result['newLines']
+					# Increase the newlines
+					newLines += result['newLines']
 
 					result['docblock'] = foundDocblock
 
@@ -1330,25 +1340,28 @@ class Statement:
 
 				elif targetName == 'paren':
 
-					(result, endId, newLines) = extractParen(rest)
+					(result, tempBeginId, endId, tempLines) = extractParen(rest)
 
 					# Store the result in the extractions
 					extractions['paren'] = {
 						'content': result,
-						'beginId': id,
-						'endId': id+endId,
+						'beginId': id+beginId,
+						'endId': id+beginId+endId,
 						'docblock': foundDocblock
 					}
 
 					# Set the next Id
 					id = id+endId+1
 
+					# Increase the newlines
+					newLines += tempLines
+
 					# Get the new rest
 					rest = text[id:]
 
 				elif targetName == 'block':
 
-					(result, endId, newLines) = extractCurly(rest)
+					(result, tempBeginId, endId, tempLines) = extractCurly(rest)
 
 					# If the result is empty, make sure it was because
 					# the block was empty
@@ -1356,27 +1369,33 @@ class Statement:
 						
 						# If there is no block, get the first expression
 						if not hasCharsAfter(rest, '{'):
-							tempResult = extractExpression(rest, scopeLevel, lineNr, startId+id, 0, True, True)
+							tempBeginId = tempResult['beginId']
+							tempResult = extractExpression(rest, scopeLevel, lineNr, id+beginId, 0, True, True)
 							result = tempResult['result']['text']
 							endId = tempResult['endId']
-							newLines = tempResult['newLines']
+							tempLines = tempResult['newLines']
 							#(result, endId, newLines) = extractExpression(rest, scopeLevel, lineNr+newLines, True, True)
 
 						pass
 
+					tempBeginId += id+beginId
+
 					# Now parse these results, too!
-					parsedResults = splitStatements(result, scopeLevel, lineNr)
+					parsedResults = splitStatements(result, scopeLevel, lineNr, tempBeginId)
 
 					# Store the result in the extractions
 					extractions['block'] = {
 						'content': result,
 						'parsed': parsedResults,
-						'beginId': id,
-						'endId': id+endId
+						'beginId': tempBeginId,
+						'endId': id+beginId+endId
 					}
 
 					# Set the next Id
 					id = id+endId+1
+
+					# Increase the newlines
+					newLines += tempLines
 
 					# Get the new rest
 					rest = text[id:]
@@ -1392,8 +1411,8 @@ class Statement:
 					if endId or endId > -1:
 						extractions[targetName] = {
 							'content': targetName,
-							'beginId': id,
-							'endId': id+endId,
+							'beginId': id+beginId,
+							'endId': id+beginId+endId,
 							'docblock': foundDocblock
 						}
 						
@@ -1424,10 +1443,10 @@ class Statement:
 		b = datetime.datetime.now()
 		c = b - a
 
-		return {'scope': scopeLevel, 'line': lineNr, 'newLines': newLines, 'openType': 'statement', 'openName': self.name, 'result': result, 'beginId': beginId, 'endId': beginId+id-1}
+		return {'scope': startScope, 'line': lineNr, 'newLines': newLines, 'openType': 'statement', 'openName': self.name, 'result': result, 'beginId': beginId, 'endId': beginId+id-1}
 
 # Get the next statement/expression
-def determineOpen(text, scopeLevel, lineNr, id):
+def determineOpen(text, scopeLevel, lineNr, id, currentId = 0):
 
 	# Do not strip the text here,
 	# It'll mess up the line numbers
@@ -1439,23 +1458,18 @@ def determineOpen(text, scopeLevel, lineNr, id):
 		# Strict means we don't care what comes after the opening tag
 		if stat.greedy:
 			if text.startswith(stat.begins):
-				return stat.extract(text, scopeLevel, lineNr, id)
-				#result, endId, newLines = stat.extract(text, scopeLevel, id)
-				#return 'statement', name, id, endId, result, newLines
+				return stat.extract(text, scopeLevel, lineNr, currentId)
 		else:
 			if hasWordNext(text, stat.begins):
-				return stat.extract(text, scopeLevel, lineNr, id)
-				#result, endId, newLines = stat.extract(text, scopeLevel, id)
-				#return 'statement', name, id, endId, result, newLines
+				pr('Extracting STAT ' + stat.name + ' currentId=' + str(currentId) + ', id=' + str(id))
+				return stat.extract(text, scopeLevel, lineNr, currentId)
 
 	# It wasn't a statement, so try getting the expression
-	return extractExpression(text, scopeLevel, lineNr, id, 0)
-	#(result, endId, newLines) = extractExpression(text, scopeLevel)
-
-	return False
+	return extractExpression(text, scopeLevel, lineNr, currentId, 0)
+	
 
 # Parsing starts here
-def splitStatements(text, scopeLevel, lineNr = 1):
+def splitStatements(text, scopeLevel, lineNr = 1, curId = 0):
 
 	# The total length of the text
 	length = len(text)
@@ -1483,7 +1497,7 @@ def splitStatements(text, scopeLevel, lineNr = 1):
 
 		if not isWhitespace(cur):
 			
-			result = determineOpen(text, scopeLevel, lineNr, id)
+			result = determineOpen(text, scopeLevel, lineNr, id, id+curId)
 
 			if result:
 
@@ -1501,7 +1515,7 @@ def splitStatements(text, scopeLevel, lineNr = 1):
 					warn('====================================')
 					break
 
-				id = endId
+				id = endId - curId
 
 		if cur == '\n':
 			lineNr += 1

@@ -97,7 +97,7 @@ class WittyStatement:
 		elif self.typeName == 'function':
 			self.processFunction()
 
-	def getNewVar(self, name, type = None):
+	def addNewVar(self, name, type = None):
 
 		newVar = {'name': name, 'type': type, 'docblock': None, 'declared': False, 'value': None}
 		self.variables[name] = newVar
@@ -110,7 +110,7 @@ class WittyStatement:
 		# Go over every assignment
 		for index, entry in enumerate(self.statement['result']):
 
-			newVar = self.getNewVar(entry['name']['name'], 'undefined')
+			newVar = self.addNewVar(entry['name']['name'], 'undefined')
 
 			# Since we used the var statement, it's declared
 			newVar['declared'] = True
@@ -132,11 +132,30 @@ class WittyStatement:
 
 		result = self.statement['result'][0]
 
+		# Add the function variable to this scope
 		if 'name' in result:
-			newVar = self.getNewVar(result['name']['name'], 'Function')
+			newVar = self.addNewVar(result['name']['name'], 'Function')
+
+		# Create a new statement for inside the next scope
+		scopeStat = WittyStatement(self.parentfile, {
+			'line': self.lineNr,
+			'docblock': None,
+			'openType': 'scope',
+			'openName': 'scope',
+			'scopeId': self.statement['subscopeId']
+			})
+
+		# Process variable in the parens,
+		# Add them to the subscope
+		parenVars = result['paren']['content'].split(',')
+		for varName in parenVars:
+			scopeStat.addNewVar(varName.strip())
 
 		# Recursively go through all the statements in this file
 		for stat in result['block']['parsed']:
 			WittyStatement(self.parentfile, stat)
+
+		
+
 
 
