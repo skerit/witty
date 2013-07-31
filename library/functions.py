@@ -905,6 +905,147 @@ def willExpressionContinue(text, id, hasBegun, waitingForOperand):
 	# If it doesn't exists, the expression has ended
 	return False
 
+def normalizeExpression(text):
+	
+	tokens = tokenizeExpression(text)
+
+	expression = {'type': None, 'target': [], 'value': []}
+	
+	piece = {}
+
+	isName = False
+
+	for i, token in enumerate(tokens):
+
+		if token['type'] == 'name':
+			# If this is the beginning of the name
+			if not isName:
+				piece['type'] = 'name'
+				piece['parts'] = [token]
+				isName = True
+				continue
+			else:
+				piece['parts'].append(token)
+				continue
+		elif token['type'] == 'assignment':
+
+			# If this expression is already an assignment,
+			# the previous value is also a target
+			if not expression['type']:
+				expression['type'] = 'assignment'
+				expression['target'].append(piece)
+			elif expression['type'] == 'assignment':
+				expression['target'].append(piece)
+
+			piece = {}
+			isName = False
+			continue
+		else:
+			if 'type' in piece and piece['type'] == 'name':
+				expression['value'].append(piece)
+				piece = {}
+				isName = False
+				continue
+			else:
+				piece = token
+				
+		expression['value'].append(piece)
+		piece = {}
+
+		isName = False
+
+	# If the last token was a name, we haven't added it yet
+	if isName:
+		expression['value'].append(piece)
+
+
+	return expression
+
+
+## Tokenize an expression line
+#  @param   text   The raw expression text
+def tokenizeExpression(text):
+
+	# Strip the text of extra whitespaces
+	text = text.strip()
+
+	# Returnvalues
+	result = []
+
+	# Skip to an id position
+	skipToId = False
+
+	isMemberOf = False
+	prev = False
+
+	for i, c in enumerate(text):
+
+		# Skip any characters we might have already added
+		if i < skipToId:
+			continue
+
+		if prev and prev['type'] == 'name' and (c == '.' or c == '['):
+			isMemberOf = True
+			continue
+
+		if isWhitespace(c):
+			continue
+
+		token = {'type': None, 'text': None}
+
+		if hasCharsNext(text, '===', i):
+			token['type'] = 'equality'
+			token['text'] = '==='
+			skipToId = i + 3
+		elif hasCharsNext(text, '==', i):
+			token['type'] = 'equality'
+			token['text'] = '=='
+			skipToId = i + 2
+		elif c == '=':
+			token['type'] = 'assignment'
+			token['text'] = '='
+		elif c in literals:
+			if c == "'" or c == '"':
+				(tempResult, tempId, tempNewLines) = extractString(text, c, i)
+
+				token['type'] = 'string'
+				token['text'] = tempResult
+
+				skipToId = i+tempId+1
+			elif c == '{':
+				(tempResult, tempBeginId, tempEndId, tempNewLines) = extractCurly(text[i:])
+
+				token['type'] = 'curly'
+				token['text'] = '{' + tempResult + '}'
+				
+				skipToId = i+tempEndId+1
+				
+			elif c == '[':
+				(tempResult, tempBeginId, tempEndId, tempNewLines) = extractSquare(text[i:])
+
+				token['type'] = 'square'
+				token['text'] = '[' + tempResult + ']'
+
+				skipToId = i+tempEndId+1
+		else:
+			# Get the first name
+			(name, endId, newLines) = extractName(text[i:])
+
+			if name:
+				token['type'] = 'name'
+				token['text'] = name
+				token['member'] = isMemberOf
+				skipToId = i+len(name)
+
+		result.append(token)
+		prev = token
+
+		# Reset certain values
+		isMemberOf = False
+
+	return result
+
+
 ## If the next line is an expression, extract it
 #  @param   text       The text to start from
 #  @param   hasBegun   If we already now this is an expression
@@ -925,6 +1066,7 @@ def extractExpression(text, scopeLevel, lineNr, currentId, startId = 0, hasBegun
 	operandBusy = False
 	docblockEnd = False
 	currentDocblock = False
+	isAssignment = False
 
 	# Extra extractions
 	extras = []
@@ -949,6 +1091,9 @@ def extractExpression(text, scopeLevel, lineNr, currentId, startId = 0, hasBegun
 		if c == ',':
 			i -= 1
 			break
+
+		if c == '=':
+			isAssignment = True
 
 		# Count newlines
 		if c == '\n':
@@ -1085,7 +1230,7 @@ def extractExpression(text, scopeLevel, lineNr, currentId, startId = 0, hasBegun
 
 	endId += currentId + startId
 
-	result = {'text': result.strip(), 'functions': extras, 'docblock': currentDocblock, 'scope': scopeLevel}
+	result = {'assignment': isAssignment, 'text': result.strip(), 'functions': extras, 'docblock': currentDocblock, 'scope': scopeLevel}
 
 	return {'scope': scopeLevel, 'line': lineNr, 'newLines': newLines, 'openType': 'expression', 'openName': 'expression', 'result': result, 'beginId': currentId, 'endId': endId, 'functions': extras}
 

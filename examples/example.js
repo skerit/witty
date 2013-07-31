@@ -18,7 +18,9 @@ var multiline = 1,
 	 */
     go;
 
+go.zever = are.zever = 'test';
 
+varone = vartwo
 
 function TEST (zever, another, varinsidetest) {
 

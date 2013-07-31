@@ -89,17 +89,35 @@ class WittyStatement:
 		return self.docblock.hasAttribute(attributeName)
 
 	def process(self):
+
 		if self.typeName == 'var':
 			self.processVar()
 		elif self.typeName == 'function':
 			self.processFunction()
+		elif self.typeName == 'expression':
+			self.processExpression()
+
+	def createEmpty(self, name, type):
+		return {'name': name, 'type': type, 'docblock': None, 'declared': False, 'value': None}
 
 	def addNewVar(self, name, type = None):
 
-		newVar = {'name': name, 'type': type, 'docblock': None, 'declared': False, 'value': None}
+		newVar = self.createEmpty(name, type)
 		self.variables[name] = newVar
 
 		return newVar
+
+	def processExpression(self):
+		# If it's not an assignment, just ignore it
+		if not self.statement['result']['assignment']:
+			return
+
+		# Get the raw expression
+		expression = wf.normalizeExpression(self.statement['result']['text'])
+
+		pr(">> Expresison name:")
+		pr(expression)
+
 
 	# Process a var statement
 	def processVar(self):
@@ -139,16 +157,15 @@ class WittyStatement:
 			'docblock': None,
 			'openType': 'scope',
 			'openName': 'scope',
-			'scopeId': self.statement['subscopeId']
+			'scopeId': self.statement['subscopeId'],
 			})
 
 		# Process variable in the parens,
 		# Add them to the subscope
 		parenVars = result['paren']['content'].split(',')
 		for varName in parenVars:
-			scopeStat.addNewVar(varName.strip())
-
-		pr(scopeStat.__dict__)
+			newVar = scopeStat.addNewVar(varName.strip())
+			newVar['declared'] = True # Parameters are declared variables
 
 		# Recursively go through all the statements in this file
 		for stat in result['block']['parsed']:

@@ -295,10 +295,12 @@ class Intel:
 
 				scopeMap[scope['id']] = newScope
 
+			#for statement in wittyFile.statements:
+			#	pr('Adding statement ' + statement.typeName + ' from line ' + str(statement.lineNr) + ' to scope ' + str(statement.scopeId))
+
 			for statement in wittyFile.statements:
 				# Get the statement's scope
 				pr(statement)
-				pr('Adding statement ' + statement.typeName + ' from line ' + str(statement.lineNr) + ' to scope ' + str(statement.scopeId))
 				statementScope = scopeMap[statement.scopeId]
 				statementScope.addVariable(statement)
 
