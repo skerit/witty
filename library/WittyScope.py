@@ -223,8 +223,7 @@ class WittyScope:
 		# Set the name
 		newVar.setName(variable['name'])
 
-		if useScope.root:
-			print('Registering "' + variable['name'] +'" to scope "' + str(useScope.name) + '"')
+		print('Registering "' + variable['name'] +'" to scope "' + str(useScope.name) + '"')
 
 		# Add it to the correct scope
 		useScope.registerVariable(newVar)

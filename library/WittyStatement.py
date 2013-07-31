@@ -89,9 +89,6 @@ class WittyStatement:
 		return self.docblock.hasAttribute(attributeName)
 
 	def process(self):
-
-		pr('Processing ' + self.typeName)
-
 		if self.typeName == 'var':
 			self.processVar()
 		elif self.typeName == 'function':
@@ -150,6 +147,8 @@ class WittyStatement:
 		parenVars = result['paren']['content'].split(',')
 		for varName in parenVars:
 			scopeStat.addNewVar(varName.strip())
+
+		pr(scopeStat.__dict__)
 
 		# Recursively go through all the statements in this file
 		for stat in result['block']['parsed']:

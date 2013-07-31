@@ -18,17 +18,23 @@ var multiline = 1,
 	 */
     go;
 
-function TEST (zever, another) {
+
+
+function TEST (zever, another, varinsidetest) {
 
 	var a = 1;
 	var level = 2;
 
-	function() {
+
+
+	function r () {
 		var level = 3;
 	}
 }
 
-function () {
+function b () {
 	var level = 2;
+
 }
+
 

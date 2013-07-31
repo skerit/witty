@@ -144,7 +144,7 @@ class WittyFile:
 
 	def getFileLine(self, linenr):
 		try:
-			return self.fileArray[linenr]
+			return self.fileArray[linenr-1]
 		except IndexError:
 			return False
 
@@ -159,8 +159,9 @@ class WittyFile:
 			else:
 				name = 'ERROR'
 		
-		pr('SCOPE')
+		pr('CREATING NEW SCOPE:')
 		pr(name)
+		pr('<<<<<<<<<<<<<<<')
 
 		self.scopes.append({'id': newId, 'name': name, 'parent': parentScope, 'variables': {}, 'level': 0})
 
