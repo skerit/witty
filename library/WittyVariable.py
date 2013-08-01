@@ -30,6 +30,10 @@ class WittyVariable:
 	# 	self.scope = scope
 	# 	self.statement = statement
 
+	def setBase(self, variable):
+		self.info = variable
+		self.type = variable['type']
+
 	## Set the name of this variable
 	#  @param   self        The object pointer
 	#  @param   name        The name of the variable

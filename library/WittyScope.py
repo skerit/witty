@@ -214,6 +214,8 @@ class WittyScope:
 		# Create a new empty variable (with the id set)
 		newVar = self.project.intel.createEmptyVariable()
 
+		newVar.setBase(variable)
+
 		# Set the scope
 		newVar.setScope(useScope)
 

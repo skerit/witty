@@ -22,6 +22,12 @@ go.zever = are.zever = 'test';
 
 varone = vartwo
 
+/**
+ * @type {String}
+ */
+var go = 'string';
+
+
 function TEST (zever, another, varinsidetest) {
 
 	var a = 1;

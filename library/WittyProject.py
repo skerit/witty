@@ -151,7 +151,7 @@ class WittyProject:
 
 			for varname, varinfo in variables.items():
 				pr(varinfo.__dict__)
-				completions.append((varname, varname))
+				completions.append((varname + '\t' + varinfo.type, varname))
 
 			# INHIBIT_WORD_COMPLETIONS = 8 = Only show these completions
 			# INHIBIT_EXPLICIT_COMPLETIONS = 16 = ?
