@@ -189,6 +189,8 @@ class WittyScope:
 		# The scope to use later on (self by default)
 		useScope = self
 
+		#pr('Adding variable to scope ' + str(self.id) + ' called "' + variable['name'] + '" declared: ' + str(declared))
+
 		# If this is not a declaration (with var)
 		# we must see if it's an existing variable
 		# in upper scopes. If it's not, we'll

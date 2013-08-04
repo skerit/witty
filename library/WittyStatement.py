@@ -150,6 +150,7 @@ class WittyStatement:
 		# Add the function variable to this scope
 		if 'name' in result:
 			newVar = self.addNewVar(result['name']['name'], 'Function')
+			newVar['declared'] = True
 
 		# Create a new statement for inside the next scope
 		scopeStat = WittyStatement(self.parentfile, {
@@ -164,8 +165,13 @@ class WittyStatement:
 		# Add them to the subscope
 		parenVars = result['paren']['content'].split(',')
 		for varName in parenVars:
-			newVar = scopeStat.addNewVar(varName.strip())
-			newVar['declared'] = True # Parameters are declared variables
+
+			# Strip out any spaces or newlines
+			varName = varName.strip()
+
+			if varName:
+				newVar = scopeStat.addNewVar(varName.strip())
+				newVar['declared'] = True # Parameters are declared variables
 
 		# Recursively go through all the statements in this file
 		for stat in result['block']['parsed']:

@@ -150,7 +150,8 @@ class WittyProject:
 			variables = scope.getAllVariables()
 
 			for varname, varinfo in variables.items():
-				pr(varinfo.__dict__)
+				#pr(varinfo.__dict__)
+				pr('Found variable inside scope ' + str(varinfo.scope.id) + ' called "' + varinfo.name + '"')
 				completions.append((varname + '\t' + str(varinfo.type), varname))
 
 			# INHIBIT_WORD_COMPLETIONS = 8 = Only show these completions
@@ -276,9 +277,6 @@ class Intel:
 			# Make a temporary map of the scopes inside this file
 			scopeMap = {1: fileScope}
 
-			print('there are ' + str(len(wittyFile.scopes)) + ' scopes')
-			pr(wittyFile.scopes)
-
 			# Loop over every scope
 			for scope in wittyFile.scopes:
 
@@ -300,7 +298,6 @@ class Intel:
 
 			for statement in wittyFile.statements:
 				# Get the statement's scope
-				pr(statement)
 				statementScope = scopeMap[statement.scopeId]
 				statementScope.addVariable(statement)
 

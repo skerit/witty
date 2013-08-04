@@ -159,10 +159,6 @@ class WittyFile:
 			else:
 				name = 'ERROR'
 		
-		pr('CREATING NEW SCOPE:')
-		pr(name)
-		pr('<<<<<<<<<<<<<<<')
-
 		self.scopes.append({'id': newId, 'name': name, 'parent': parentScope, 'variables': {}, 'level': 0})
 
 		self.scopeDocBlocks[newId] = docBlock

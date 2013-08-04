@@ -21,6 +21,9 @@ class WittyVariable:
 	# Where was this variable used?
 	statements = []
 
+	# Properties of this variable
+	properties = {}
+
 	## Constructor
 	#  @param   self        The object pointer
 	#  @param   statement   The statement of declaration
@@ -57,3 +60,7 @@ class WittyVariable:
 	#  @param   statement   The statement where we appeared
 	def addAppearance(self, scope, statement):
 		self.statements.append(statement)
+
+	## Add a property to this variable
+	def addProperty(self):
+		pass

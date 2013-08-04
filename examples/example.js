@@ -37,6 +37,7 @@ function TEST (zever, another, varinsidetest) {
 
 	function r () {
 		var level = 3;
+		var rvar = 1;
 	}
 }
 
@@ -44,5 +45,3 @@ function b () {
 	var level = 2;
 
 }
-
-
