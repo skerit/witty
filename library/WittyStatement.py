@@ -115,7 +115,7 @@ class WittyStatement:
 		# Get the raw expression
 		expression = wf.normalizeExpression(self.statement['result']['text'])
 
-		pr(">> Expresison name:")
+		pr(">> Expression name:")
 		pr(expression)
 
 

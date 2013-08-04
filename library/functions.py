@@ -279,6 +279,7 @@ def _hasChars(text, word, id = False, ignoreBeginningWhitespace = True, ignoreEn
 	#pr('Looking for ' + str(word) + ' in text ' + text[id:id+5] + '... ignoreBeginningWhitespace: ' + str(ignoreBeginningWhitespace) + ' ignoreEndWhitespace: ' + str(ignoreEndWhitespace))
 
 	result = False
+	originalText = text
 
 	while True:
 	
@@ -296,7 +297,7 @@ def _hasChars(text, word, id = False, ignoreBeginningWhitespace = True, ignoreEn
 		try:
 			# If we should ignore the beginning space, recurse
 			if ignoreBeginningWhitespace and text[id] in whitespace:
-				return _hasChars(text, word, id+1, ignoreBeginningWhitespace, ignoreEndWhitespace, returnId, returnWord)
+				return _hasChars(originalText, word, id+1, ignoreBeginningWhitespace, ignoreEndWhitespace, returnId, returnWord)
 
 		except IndexError:
 			break
@@ -1067,6 +1068,7 @@ def extractExpression(text, scopeLevel, lineNr, currentId, startId = 0, hasBegun
 	docblockEnd = False
 	currentDocblock = False
 	isAssignment = False
+	justFoundDb = False
 
 	# Extra extractions
 	extras = []
@@ -1121,6 +1123,8 @@ def extractExpression(text, scopeLevel, lineNr, currentId, startId = 0, hasBegun
 
 			if hasBegun and tempWord == 'function':
 
+				justFoundDb = False
+
 				# Extract the function
 				tempResult = function.extract(text, scopeLevel, lineNr+newLines, i)
 
@@ -1161,6 +1165,7 @@ def extractExpression(text, scopeLevel, lineNr, currentId, startId = 0, hasBegun
 			newLines += tempNewLines
 
 			hasBegun = True
+			justFoundDb = False
 
 			waitingForOperand = False
 			
@@ -1171,6 +1176,7 @@ def extractExpression(text, scopeLevel, lineNr, currentId, startId = 0, hasBegun
 			skip = getNextCharId(text, '*/', i)
 
 			if skip > -1:
+				justFoundDb = True
 				currentDocblock = text[i:skip+1]
 				skipToId = skip + 2
 				docblockEnd = skip + 1
@@ -1209,17 +1215,19 @@ def extractExpression(text, scopeLevel, lineNr, currentId, startId = 0, hasBegun
 				newLines += tempNewLines
 
 			waitingForOperand = False
+			justFoundDb = False
 
 			continue
 			
 		else:
 			result += c
 			operandBusy = True
+			justFoundDb = False
 			continue
 
 	# If the parsed text ends with a docblock, rewind the ending id
 	if docblockEnd:
-		tempText = text[:i].strip()
+		tempText = text[:i+1].strip()
 
 		if tempText.endswith('*/'):
 			endId = docblockOpen
@@ -1405,6 +1413,14 @@ class Statement:
 			# Have we found a docblock in the mean time?
 			foundDocblock = False
 
+			# Last target end
+			lastTargetEnd = 0
+
+			dbFoundNow = False
+			dbSetNow = False
+			dbPrevEnd = 0
+			dbPrevLines = 0
+
 			# See what we have to do next
 			while True:
 
@@ -1416,10 +1432,15 @@ class Statement:
 				(dbResult, dbEndId, dbNewLines) = extractGreedy(text[id:], '/*', '*/', True)
 
 				if dbResult:
+					dbFoundNow = True
+					dbPrevEnd = dbEndId
+					dbPrevLines = dbNewLines
+
 					foundDocblock = dbResult
 					id += dbEndId+1
 					newLines += dbNewLines
 					if not extractions['docblock']:
+						dbSetNow = True
 						extractions['docblock'] = foundDocblock
 					continue
 
@@ -1442,6 +1463,11 @@ class Statement:
 
 				(targetName, targetRequired, extraOptions) = self.getNextTarget(position)
 
+				# If we did find a target, we don't need to worry about the db
+				if targetName:
+					dbFoundNow = False
+					dbSetNow = False
+
 				if targetName == 'name':
 
 					(result, endId, tempLines) = extractName(text[id:])
@@ -1456,6 +1482,7 @@ class Statement:
 
 					# Set the next Id
 					id = id+endId+1
+					lastTargetEnd = id
 
 					# Increase the newlines
 					newLines += tempLines
@@ -1468,20 +1495,25 @@ class Statement:
 					#(result, endId, newLines) = extractExpression(text, scopeLevel, lineNr+newLines, id, expressionHasBegun, waitingForOperand)
 					result = extractExpression(text, scopeLevel, lineNr, beginId, id, expressionHasBegun, waitingForOperand)
 
-					# Increase the newlines
-					newLines += result['newLines']
+					# If the extracted expression is an empty string... 
+					# Well then we didn't extract anything and we should discard it
+					if result['result']['text']:
 
-					result['docblock'] = foundDocblock
+						# Increase the newlines
+						newLines += result['newLines']
 
-					extractions['expression'] = result
+						result['docblock'] = foundDocblock
 
-					id = result['endId'] + 1 - beginId
+						extractions['expression'] = result
 
-					expressionHasBegun = False
-					waitingForOperand = False
+						id = result['endId'] + 1 - beginId
+						lastTargetEnd = id
 
-					# Get the new rest
-					rest = text[id:]
+						expressionHasBegun = False
+						waitingForOperand = False
+
+						# Get the new rest
+						rest = text[id:]
 
 				elif targetName == 'paren':
 
@@ -1497,6 +1529,7 @@ class Statement:
 
 					# Set the next Id
 					id = id+endId+1
+					lastTargetEnd = id
 
 					# Increase the newlines
 					newLines += tempLines
@@ -1538,6 +1571,7 @@ class Statement:
 
 					# Set the next Id
 					id = id+endId+1
+					lastTargetEnd = id
 
 					# Increase the newlines
 					newLines += tempLines
@@ -1563,6 +1597,7 @@ class Statement:
 						
 						# Set the next Id
 						id = id+endId+1
+						lastTargetEnd = id
 
 						# Get the new rest
 						rest = text[id:]
@@ -1574,6 +1609,14 @@ class Statement:
 							continue
 
 				else:
+					# If we found a db this iteration,
+					# but need to break, we have to discard it
+					if dbFoundNow:
+						id -= dbPrevEnd + 1
+						newLines -= dbPrevLines
+						if dbSetNow:
+							extractions['docblock'] = False
+
 					break
 
 				foundDocblock = False
@@ -1588,7 +1631,7 @@ class Statement:
 		b = datetime.datetime.now()
 		c = b - a
 
-		return {'scope': startScope, 'line': lineNr, 'newLines': newLines, 'openType': 'statement', 'openName': self.name, 'result': result, 'beginId': beginId, 'endId': beginId+id-1}
+		return {'scope': startScope, 'line': lineNr, 'newLines': newLines, 'openType': 'statement', 'openName': self.name, 'result': result, 'beginId': beginId, 'endId': beginId+lastTargetEnd-1}
 
 # Get the next statement/expression
 def determineOpen(text, scopeLevel, lineNr, id, currentId = 0):
@@ -1606,7 +1649,6 @@ def determineOpen(text, scopeLevel, lineNr, id, currentId = 0):
 				return stat.extract(text, scopeLevel, lineNr, currentId)
 		else:
 			if hasWordNext(text, stat.begins):
-				pr('Extracting STAT ' + stat.name + ' currentId=' + str(currentId) + ', id=' + str(id))
 				return stat.extract(text, scopeLevel, lineNr, currentId)
 
 	# It wasn't a statement, so try getting the expression

@@ -38,7 +38,7 @@ class WittyProject:
 		
 	# Begin parsing files
 	def parseFiles(self, savedFileName = ''):
-
+		
 		# If a thread is already running: stop it
 		if self.id in parserThreads and parserThreads[self.id]:
 			print('Killing running thread')
@@ -151,7 +151,7 @@ class WittyProject:
 
 			for varname, varinfo in variables.items():
 				pr(varinfo.__dict__)
-				completions.append((varname + '\t' + varinfo.type, varname))
+				completions.append((varname + '\t' + str(varinfo.type), varname))
 
 			# INHIBIT_WORD_COMPLETIONS = 8 = Only show these completions
 			# INHIBIT_EXPLICIT_COMPLETIONS = 16 = ?

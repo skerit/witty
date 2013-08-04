@@ -199,7 +199,12 @@ class WittyScope:
 			# If it's an existing var, add an appearance
 			if existingVar:
 				existingVar.addAppearance(statement, self)
+				return existingVar
 			else:
+
+				# Create a new empty variable (with the id set)
+				newVar = self.project.intel.createEmptyVariable()
+
 				# @todo: In node.js you can't set something to the global by just omitting var
 				# So we'll have to find something for that
 				# Set the scope to the root scope (global)
@@ -210,9 +215,13 @@ class WittyScope:
 
 				# If it has not been found, raise an error
 				if not useScope: raise Exception('FileScope not found')
+		else:
+			existingVar = self.findVariable(variable['name'], True)
 
-		# Create a new empty variable (with the id set)
-		newVar = self.project.intel.createEmptyVariable()
+			if existingVar:
+				newVar = existingVar
+			else:
+				newVar = self.project.intel.createEmptyVariable()
 
 		newVar.setBase(variable)
 
