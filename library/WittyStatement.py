@@ -145,6 +145,7 @@ class WittyStatement:
 
 		pr(">> Expression name:")
 		pr(expression)
+		pr(self.statement)
 		targetVar = False
 
 		for target in expression['target']:
@@ -159,6 +160,11 @@ class WittyStatement:
 			# If there's a type, set it to the last prop
 			# We don't parse the value yet, so just set it to unknwon
 			if prop != targetVar: prop['type'] = 'unknown'
+
+			# If there is a docblock here, set that
+			if self.statement['docblock']:
+				prop['docblock'] = self.statement['docblock']
+
 
 	# Process a var statement
 	def processVar(self):

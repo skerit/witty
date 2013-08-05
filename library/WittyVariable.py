@@ -1,4 +1,5 @@
 import Witty.library.functions as wf
+from Witty.library.Docblock import Docblock
 
 # Debug wrappers
 def warn(message, showStack = True): wf.warn(message, showStack, 3)
@@ -25,6 +26,8 @@ class WittyVariable:
 	properties = None
 	propArray = None
 
+	docblock = None
+
 	## Constructor
 	#  @param   self        The object pointer
 	#  @param   statement   The statement of declaration
@@ -34,9 +37,28 @@ class WittyVariable:
 		self.propArray = []
 		self.properties = {}
 
+	def setDocblock(self, text):
+		
+		if not text:
+			return
+
+		if isinstance(text, Docblock):
+			self.docblock = text
+		else:
+			self.docblock = Docblock(text)
+
+		type = self.docblock.getType()
+
+		if type:
+			self.type = type
+
+
 	def setBase(self, variable):
 		self.info = variable
 		self.type = variable['type']
+
+		if variable['docblock']:
+			self.setDocblock(variable['docblock'])
 
 	## Set the name of this variable
 	#  @param   self        The object pointer
@@ -70,6 +92,9 @@ class WittyVariable:
 
 	## Add a property to this variable
 	def addProperty(self, name, info):
+
+		pr('Adding prop ' + name)
+		pr(info)
 		
 		if name in self.properties:
 			prop = self.properties[name]
@@ -94,3 +119,6 @@ class WittyVariable:
 
 			self.properties[name] = prop
 			self.propArray.append(prop)
+
+		# Recursively add deeper properties
+		prop.touchProperties(info['properties'])
