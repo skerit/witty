@@ -227,10 +227,10 @@ class WittyScope:
 			else:
 				newVar = self.project.intel.createEmptyVariable()
 
-		newVar.setBase(variable)
-
 		# Set the scope
 		newVar.setScope(useScope)
+
+		newVar.setBase(variable)
 
 		# Set the statement
 		newVar.setStatement(statement)

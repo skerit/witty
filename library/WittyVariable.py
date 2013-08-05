@@ -60,6 +60,42 @@ class WittyVariable:
 		if variable['docblock']:
 			self.setDocblock(variable['docblock'])
 
+		pr('Checking type: ' + str(self.type))
+
+		if not self.type or self.type in ['undefined', 'unknown']:
+
+			pr(variable)
+
+			if variable['value'] and 'result' in variable['value']:
+				# See if there is a value assignment
+				value = variable['value']['result']['text']
+
+				pr('>>>>>>>>')
+				pr(value)
+
+				if value[0] == '"' or value[0] == "'":
+					self.type = 'String'
+				elif value in ['true', 'false']:
+					self.type = 'Boolean'
+				elif value[0] == '{':
+					self.type = 'Object'
+				elif value[0] == '[':
+					self.type = 'Array'
+				elif value.isdigit():
+					self.type = 'Number'
+				elif self.scope:
+					# See if it's an existing variable somewhere
+					existing = self.scope.findVariable(value)
+
+					if existing:
+
+						if existing.type in ['Function', 'Object', 'Array']:
+							# Link the 2 together
+							self.properties = existing.properties
+							self.propArray = existing.propArray
+
+						self.type = existing.type
+
 	## Set the name of this variable
 	#  @param   self        The object pointer
 	#  @param   name        The name of the variable

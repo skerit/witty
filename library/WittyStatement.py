@@ -220,9 +220,6 @@ class WittyStatement:
 		parenVars = result['paren']['content'].split(',')
 
 		paraminfo = self.docblock.getParams()
-		pr(paraminfo)
-		pr(self.statement)
-		pr(self.scope)
 
 		for varName in parenVars:
 
