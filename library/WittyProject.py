@@ -92,7 +92,7 @@ class WittyProject:
 		lines = []
 
 		for l in to_cursor_lines:
-			lines.append(view.substr(l).strip())
+			lines.append(wf.removeComment(view.substr(l).strip()))
 
 		stack = []
 		oBraces = 0
@@ -139,15 +139,98 @@ class WittyProject:
 		# Get the line after the cursor
 		right_line = full_line[col:].strip()
 
+		# All lines to the cursor
+		text = '\n'.join(lines)
+
 		# Get the better prefix
 		brefix = wf.getBetterPrefix(left_line)
+
+		stats = wf.splitStatements(text, 0)
+		lastStat = stats[len(stats)-1]
 
 		scope = self.getScope(current_file, function_scope)
 
 		if scope:
-			completions = []
 
-			variables = scope.getAllVariables()
+			getScopeVars = False
+			normalized = False
+
+			if lastStat['openName'] == 'var':
+				lastExpr = lastStat['result'][len(lastStat['result'])-1]
+				expr = lastExpr['expression']['result']['text']
+
+				try:
+					normalized = wf.tokenizeExpression(expr)
+				except KeyError:
+					getScopeVars = True
+
+			elif lastStat['openName'] == 'expression':
+				expr = lastStat['result']['text']
+
+				if expr:
+					normalized = wf.tokenizeExpression(expr)
+				else:
+					getScopeVars = True
+
+			pr(normalized)
+
+			if normalized:
+				normalized = wf.tokenizeExpression(expr)
+
+				temp = expr.replace(' ', '')
+				temp = temp.replace('\n', '')
+				temp = temp.replace('\t', '')
+
+				endsWithMember = False
+
+				if temp.endswith('.') or temp.endswith('['):
+					endsWithMember = True
+
+				active = {}
+				
+				for token in normalized:
+
+					if not token['type']:
+						active = {}
+						continue
+
+					if 'member' in token and not token['member']:
+						active = {}
+						active['name'] = token['text']
+						active['properties'] = []
+					else:
+						active['properties'].append(token['text'])
+
+				if 'properties' in active and not endsWithMember and len(active['properties']):
+					del active['properties'][len(active['properties'])-1]
+
+				pr('>> Active found:')
+				pr(active)
+
+
+				if 'name' in active:
+					foundVar = scope.findVariable(active['name'])
+					variables = foundVar.properties
+
+					for prop in active['properties']:
+						
+						if foundVar and prop in foundVar.properties:
+							foundVar = foundVar.properties[prop]
+
+					if foundVar:
+						pr(foundVar.__dict__)
+						variables = foundVar.properties
+				else:
+					getScopeVars = True
+			else:
+				getScopeVars = True
+				pr(lastStat)
+				pr('<<<<<<<<<<<<<<<<')
+
+			if getScopeVars:
+				variables = scope.getAllVariables()
+
+			completions = []
 
 			for varname, varinfo in variables.items():
 				pr(varinfo.__dict__)

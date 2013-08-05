@@ -73,6 +73,24 @@ class WittyVariable:
 		
 		if name in self.properties:
 			prop = self.properties[name]
+
+			# If there is a new type set
+			if info['type']:
+				prop.type = info['type']
+
 		else:
-			self.properties[name] = info
-			self.propArray.append(info)
+			prop = WittyVariable()
+
+			# Add some basic info
+			prop.id = 0
+			prop.setScope(self.scope)
+			prop.setStatement(self.statement)
+
+			# Set the name
+			prop.setName(name)
+
+			# Set basic info
+			prop.setBase(info)
+
+			self.properties[name] = prop
+			self.propArray.append(prop)

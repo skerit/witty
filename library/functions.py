@@ -199,6 +199,8 @@ def pr(message, showStack = True, stackLevel = 2):
 #  @param   text
 def getBetterPrefix(text):
 
+	pr(text)
+
 	# Get everything after these chars, in this order
 	chars = [' ', '(', ')', '[', ']', '-', '+']
 
@@ -263,6 +265,27 @@ def getSurround(text, id, default = ''):
 		next = text[id+1]
 
 	return previous, next
+
+def removeComment(text):
+
+	skipToId = False
+	newLines = 0
+	i = 0
+
+	for i, c in enumerate(text):
+
+		if skipToId > i:
+			continue
+
+		if c == '\n':
+			newLines += 1
+		elif c == "'" or c == '"':
+			(tempResult, tempId, tempNewLines) = extractString(text, c, i)
+			skipToId = i+tempId+1
+		elif hasCharsNext(text, '//', i):
+			return text[:i]
+
+	return text
 
 def hasWordNext(text, word, id = False):
 	return _hasChars(text, word, id, False, False)

@@ -20,6 +20,19 @@ var multiline = 1,
 
 
 go.myproperty = 1;
-zever = 1;
+go.another = 1;
 
+go.another.test = 1;
 
+/**
+ * @type {Number}
+ */
+go.what = 1;
+
+function() {
+
+	this.a = 1;
+
+	
+
+}
