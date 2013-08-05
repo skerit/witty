@@ -201,6 +201,8 @@ class WittyScope:
 			# If it's an existing var, add an appearance
 			if existingVar:
 				existingVar.addAppearance(statement, self)
+				# Add possible properties
+				existingVar.touchProperties(variable['properties'])
 				return existingVar
 			else:
 
@@ -238,6 +240,9 @@ class WittyScope:
 
 		# Add it to the correct scope
 		useScope.registerVariable(newVar)
+
+		# Add possible properties
+		newVar.touchProperties(variable['properties'])
 
 		return newVar
 

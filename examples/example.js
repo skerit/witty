@@ -18,30 +18,8 @@ var multiline = 1,
 	 */
     go;
 
-go.zever = are.zever = 'test';
 
-varone = vartwo
-
-/**
- * @type {String}
- */
-var go = 'string';
+go.myproperty = 1;
+zever = 1;
 
 
-function TEST (zever, another, varinsidetest) {
-
-	var a = 1;
-	var level = 2;
-
-
-
-	function r () {
-		var level = 3;
-		var rvar = 1;
-	}
-}
-
-function b () {
-	var level = 2;
-
-}

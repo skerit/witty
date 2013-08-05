@@ -98,12 +98,40 @@ class WittyStatement:
 			self.processExpression()
 
 	def createEmpty(self, name, type):
-		return {'name': name, 'type': type, 'docblock': None, 'declared': False, 'value': None}
+		return {
+			'name': name,
+			'type': type,
+			'docblock': None,
+			'declared': False,
+			'value': None,
+			'properties': {}
+		}
 
-	def addNewVar(self, name, type = None):
+	def touchProperty(self, parent, name, type = None):
 
-		newVar = self.createEmpty(name, type)
-		self.variables[name] = newVar
+		if name in parent['properties']:
+			prop = parent['properties'][name]
+			if type: prop['type'] = type
+		else:
+			prop = self.createEmpty(name, type)
+			prop['type'] = type
+			prop['declared'] = 'property'
+			parent['properties'][name] = prop
+
+		return prop
+
+	## Touch a variable, possibly creating it in the process
+	#  @param   self           The object pointer
+	#  @param   name           The name of the variable
+	#  @param   type           The type of the variable
+	def touchVar(self, name, type = None):
+
+		if name in self.variables:
+			newVar = self.variables[name]
+			if type: newVar['type'] = type
+		else:
+			newVar = self.createEmpty(name, type)
+			self.variables[name] = newVar
 
 		return newVar
 
@@ -117,7 +145,20 @@ class WittyStatement:
 
 		pr(">> Expression name:")
 		pr(expression)
+		targetVar = False
 
+		for target in expression['target']:
+			targetVar = self.touchVar(target['name'])
+
+			prop = targetVar
+
+			# Now go over every property
+			for part in target['parts']:
+				prop = self.touchProperty(prop, part['text'])
+
+			# If there's a type, set it to the last prop
+			# We don't parse the value yet, so just set it to unknwon
+			if prop != targetVar: prop['type'] = 'unknown'
 
 	# Process a var statement
 	def processVar(self):
@@ -125,7 +166,7 @@ class WittyStatement:
 		# Go over every assignment
 		for index, entry in enumerate(self.statement['result']):
 
-			newVar = self.addNewVar(entry['name']['name'], 'undefined')
+			newVar = self.touchVar(entry['name']['name'], 'undefined')
 
 			# Since we used the var statement, it's declared
 			newVar['declared'] = True
@@ -149,7 +190,7 @@ class WittyStatement:
 
 		# Add the function variable to this scope
 		if 'name' in result:
-			newVar = self.addNewVar(result['name']['name'], 'Function')
+			newVar = self.touchVar(result['name']['name'], 'Function')
 			newVar['declared'] = True
 
 		# Create a new statement for inside the next scope
@@ -170,7 +211,7 @@ class WittyStatement:
 			varName = varName.strip()
 
 			if varName:
-				newVar = scopeStat.addNewVar(varName.strip())
+				newVar = scopeStat.touchVar(varName.strip())
 				newVar['declared'] = True # Parameters are declared variables
 
 		# Recursively go through all the statements in this file

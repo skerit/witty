@@ -922,10 +922,17 @@ def normalizeExpression(text):
 			# If this is the beginning of the name
 			if not isName:
 				piece['type'] = 'name'
-				piece['parts'] = [token]
+
+				# Set the main variable
+				piece['name'] = token['text']
+
+				# Allow for variable properties
+				piece['parts'] = []
 				isName = True
 				continue
 			else:
+				# Delete redundant information
+				del token['member']
 				piece['parts'].append(token)
 				continue
 		elif token['type'] == 'assignment':

@@ -19,19 +19,20 @@ class WittyVariable:
 	statement = None
 
 	# Where was this variable used?
-	statements = []
+	statements = None
 
 	# Properties of this variable
-	properties = {}
+	properties = None
+	propArray = None
 
 	## Constructor
 	#  @param   self        The object pointer
 	#  @param   statement   The statement of declaration
 	#  @param   scope       The parent WittyScope
-	# def __init__(self, statement, scope):
-
-	# 	self.scope = scope
-	# 	self.statement = statement
+	def __init__(self):
+		self.statements = []
+		self.propArray = []
+		self.properties = {}
 
 	def setBase(self, variable):
 		self.info = variable
@@ -61,6 +62,17 @@ class WittyVariable:
 	def addAppearance(self, scope, statement):
 		self.statements.append(statement)
 
+	def touchProperties(self, properties):
+
+		for name, prop in properties.items():
+			self.addProperty(prop['name'], prop)
+
+
 	## Add a property to this variable
-	def addProperty(self):
-		pass
+	def addProperty(self, name, info):
+		
+		if name in self.properties:
+			prop = self.properties[name]
+		else:
+			self.properties[name] = info
+			self.propArray.append(info)

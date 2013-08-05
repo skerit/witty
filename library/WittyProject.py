@@ -150,9 +150,9 @@ class WittyProject:
 			variables = scope.getAllVariables()
 
 			for varname, varinfo in variables.items():
-				#pr(varinfo.__dict__)
+				pr(varinfo.__dict__)
 				pr('Found variable inside scope ' + str(varinfo.scope.id) + ' called "' + varinfo.name + '"')
-				completions.append((varname + '\t' + str(varinfo.type), varname))
+				completions.append((varname + '\t' + str(len(varinfo.propArray)) + '\t' + str(varinfo.type), varname))
 
 			# INHIBIT_WORD_COMPLETIONS = 8 = Only show these completions
 			# INHIBIT_EXPLICIT_COMPLETIONS = 16 = ?
