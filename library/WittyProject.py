@@ -210,16 +210,18 @@ class WittyProject:
 
 				if 'name' in active:
 					foundVar = scope.findVariable(active['name'])
-					variables = foundVar.properties
-
-					for prop in active['properties']:
-						
-						if foundVar and prop in foundVar.properties:
-							foundVar = foundVar.properties[prop]
 
 					if foundVar:
-						pr(foundVar.__dict__)
 						variables = foundVar.properties
+
+						for prop in active['properties']:
+							
+							if foundVar and prop in foundVar.properties:
+								foundVar = foundVar.properties[prop]
+
+						variables = foundVar.properties
+					else:
+						getScopeVars = True
 				else:
 					getScopeVars = True
 			else:

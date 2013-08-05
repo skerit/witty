@@ -85,6 +85,8 @@ class WittyFile:
 	#  @param   scopeId             The id of the scope it's in (id in the file)
 	def parseStatement(self, statement, scopeId, docblock = False):
 
+		pr(statement)
+
 		statement['scopeId'] = scopeId
 		statement['line'] = self.original.count('\n', 0, statement['beginId']) + 1
 
@@ -114,6 +116,8 @@ class WittyFile:
 				if 'block' in r:
 
 					if statement['openName'] == 'function':
+						pr(r)
+						pr(statement)
 						newScope = self.createNewScope(statement['line'], scopeId, docblock)
 						statement['subscopeId'] = newScope
 						for stat in r['block']['parsed']:

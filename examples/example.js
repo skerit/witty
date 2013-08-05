@@ -27,3 +27,15 @@ go.another = 1;
  */
 go.another.test = 1;
 
+/**
+ * @param   {Number}   myparam   The parameter
+ */
+function Class2 (myparam) {
+	this.test = 1;
+
+	
+
+}
+
+var a = 1;
+

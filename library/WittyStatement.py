@@ -104,6 +104,7 @@ class WittyStatement:
 			'docblock': None,
 			'declared': False,
 			'value': None,
+			'description': None,
 			'properties': {}
 		}
 
@@ -132,6 +133,10 @@ class WittyStatement:
 		else:
 			newVar = self.createEmpty(name, type)
 			self.variables[name] = newVar
+
+		# this is always declared
+		if name == 'this' or name == 'arguments':
+			newVar['declared'] = True
 
 		return newVar
 
@@ -192,6 +197,8 @@ class WittyStatement:
 	# Process a function statement
 	def processFunction(self):
 
+		pr('>>>>>>>>>> Processing function!')
+
 		result = self.statement['result'][0]
 
 		# Add the function variable to this scope
@@ -211,6 +218,12 @@ class WittyStatement:
 		# Process variable in the parens,
 		# Add them to the subscope
 		parenVars = result['paren']['content'].split(',')
+
+		paraminfo = self.docblock.getParams()
+		pr(paraminfo)
+		pr(self.statement)
+		pr(self.scope)
+
 		for varName in parenVars:
 
 			# Strip out any spaces or newlines
@@ -219,6 +232,10 @@ class WittyStatement:
 			if varName:
 				newVar = scopeStat.touchVar(varName.strip())
 				newVar['declared'] = True # Parameters are declared variables
+
+				if varName in paraminfo:
+					newVar['type'] = paraminfo[varName]['type']
+					newVar['description'] = paraminfo[varName]['description']
 
 		# Recursively go through all the statements in this file
 		for stat in result['block']['parsed']:

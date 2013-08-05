@@ -64,8 +64,11 @@ class Docblock:
 	# Get the type property
 	def getType(self):
 		result = self.getAttribute('type')
-		result = re.sub('{', '', result)
-		result = re.sub('}', '', result)
+
+		if result:
+			result = re.sub('{', '', result)
+			result = re.sub('}', '', result)
+			
 		return result
 
 	# Parse a simple attribute
