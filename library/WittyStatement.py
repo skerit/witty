@@ -105,6 +105,7 @@ class WittyStatement:
 			'declared': False,
 			'value': None,
 			'description': None,
+			'reference': False,
 			'properties': {}
 		}
 
@@ -174,6 +175,8 @@ class WittyStatement:
 	# Process a var statement
 	def processVar(self):
 
+		#pr(self.statement)
+
 		# Go over every assignment
 		for index, entry in enumerate(self.statement['result']):
 
@@ -183,8 +186,12 @@ class WittyStatement:
 			newVar['declared'] = True
 
 			if '=' in entry and 'expression' in entry:
-				# @todo: what goes on in this expression?
-				newVar['value'] = entry['expression']
+
+				if entry['expression']['functions']:
+					self.processFunction(entry['expression']['functions'][0], newVar)
+				else:
+					# @todo: what goes on in this expression?
+					newVar['value'] = entry['expression']
 
 			if entry['docblock']:
 
@@ -195,16 +202,26 @@ class WittyStatement:
 
 
 	# Process a function statement
-	def processFunction(self):
+	def processFunction(self, result = None, newVar = None):
+
+		if not result:
+			result = self.statement['result'][0]
+
+		#if not scopeId:
+		#scopeId = self.statement['subscopeId']
+		if 'scopeId' in result:
+			scopeId = result['scopeId']
+		else:
+			scopeId = self.statement['subscopeId']
 
 		pr('>>>>>>>>>> Processing function!')
 
-		result = self.statement['result'][0]
-
 		# Add the function variable to this scope
-		if 'name' in result:
+		if not newVar and 'name' in result:
 			newVar = self.touchVar(result['name']['name'], 'Function')
 			newVar['declared'] = True
+
+		newVar['type'] = 'Function'
 
 		# Create a new statement for inside the next scope
 		scopeStat = WittyStatement(self.parentfile, {
@@ -212,7 +229,7 @@ class WittyStatement:
 			'docblock': None,
 			'openType': 'scope',
 			'openName': 'scope',
-			'scopeId': self.statement['subscopeId'],
+			'scopeId': scopeId,
 			})
 
 		# Process variable in the parens,
@@ -227,12 +244,18 @@ class WittyStatement:
 			varName = varName.strip()
 
 			if varName:
-				newVar = scopeStat.touchVar(varName.strip())
-				newVar['declared'] = True # Parameters are declared variables
+				parVar = scopeStat.touchVar(varName.strip())
+				parVar['declared'] = True # Parameters are declared variables
 
 				if varName in paraminfo:
-					newVar['type'] = paraminfo[varName]['type']
-					newVar['description'] = paraminfo[varName]['description']
+					parVar['type'] = paraminfo[varName]['type']
+					parVar['description'] = paraminfo[varName]['description']
+
+		# Add the function name as a variable to the current scope
+		if 'name' in result:
+			parVar = scopeStat.touchVar(result['name']['name'])
+			parVar['declared'] = True
+			parVar['reference'] = newVar['name']
 
 		# Recursively go through all the statements in this file
 		for stat in result['block']['parsed']:

@@ -66,7 +66,9 @@ class WittyVariable:
 				# See if there is a value assignment
 				value = variable['value']['result']['text']
 
-				if value[0] == '"' or value[0] == "'":
+				if not len(value):
+					pass # Do nothing if there is no text
+				elif value[0] == '"' or value[0] == "'":
 					self.type = 'String'
 				elif value in ['true', 'false']:
 					self.type = 'Boolean'
@@ -81,13 +83,16 @@ class WittyVariable:
 					existing = self.scope.findVariable(value)
 
 					if existing:
+						self.makeReference(existing)
 
-						if existing.type in ['Function', 'Object', 'Array']:
-							# Link the 2 together
-							self.properties = existing.properties
-							self.propArray = existing.propArray
+	# Make a reference to another variable
+	def makeReference(self, existing):
 
-						self.type = existing.type
+		if existing.type in ['Function', 'Object', 'Array']:
+			self.properties = existing.properties
+			self.propArray = existing.propArray
+
+		self.type = existing.type
 
 	## Set the name of this variable
 	#  @param   self        The object pointer

@@ -1150,6 +1150,8 @@ def extractExpression(text, scopeLevel, lineNr, currentId, startId = 0, hasBegun
 			# Look for a statement
 			(tempWord, tempId, tempNewLines) = extractStatementAfter(text, i)
 
+			pr(tempWord)
+
 		# A statement word was found
 		if tempWord:
 
@@ -1495,6 +1497,8 @@ class Statement:
 
 				(targetName, targetRequired, extraOptions) = self.getNextTarget(position)
 
+				pr('Getting target ' + str(targetName))
+
 				# If we did find a target, we don't need to worry about the db
 				if targetName:
 					dbFoundNow = False
@@ -1527,9 +1531,14 @@ class Statement:
 					#(result, endId, newLines) = extractExpression(text, scopeLevel, lineNr+newLines, id, expressionHasBegun, waitingForOperand)
 					result = extractExpression(text, scopeLevel, lineNr, beginId, id, expressionHasBegun, waitingForOperand)
 
+					if scopeLevel == 1: pr(result)
+					if scopeLevel == 1: pr({'text': text[id:], 'id': id})
+					
+					
+
 					# If the extracted expression is an empty string... 
 					# Well then we didn't extract anything and we should discard it
-					if result['result']['text']:
+					if result['result']['functions'] or result['result']['text']:
 
 						# Increase the newlines
 						newLines += result['newLines']
@@ -1681,7 +1690,10 @@ def determineOpen(text, scopeLevel, lineNr, id, currentId = 0):
 				return stat.extract(text, scopeLevel, lineNr, currentId)
 		else:
 			if hasWordNext(text, stat.begins):
+				if scopeLevel == 1: pr('Extracting ' + stat.name)
 				return stat.extract(text, scopeLevel, lineNr, currentId)
+
+	pr('Expression:')
 
 	# It wasn't a statement, so try getting the expression
 	return extractExpression(text, scopeLevel, lineNr, currentId, 0)
@@ -1708,6 +1720,8 @@ def splitStatements(text, scopeLevel, lineNr = 1, curId = 0):
 
 	results = []
 
+	if scopeLevel == 1: pr('\n\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+
 	# Go over every letter
 	while id < length:
 
@@ -1715,8 +1729,10 @@ def splitStatements(text, scopeLevel, lineNr = 1, curId = 0):
 		cur = text[id]
 
 		if not isWhitespace(cur):
-			
+
 			result = determineOpen(text, scopeLevel, lineNr, id, id+curId)
+
+			if scopeLevel == 1: pr(result)
 
 			if result:
 
@@ -1740,6 +1756,8 @@ def splitStatements(text, scopeLevel, lineNr = 1, curId = 0):
 			lineNr += 1
 
 		id += 1
+
+	if scopeLevel == 1: pr('\n<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n\n')
 
 	returnResults = []
 	dbnow = False
