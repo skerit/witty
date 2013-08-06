@@ -159,9 +159,13 @@ class WittyProject:
 				lastExpr = lastStat['result'][len(lastStat['result'])-1]
 				expr = lastExpr['expression']['result']['text']
 
-				try:
-					normalized = wf.tokenizeExpression(expr)
-				except KeyError:
+				# Only get more info if the last expression hasn't been terminated!
+				if not lastExpr['expression']['terminated']:
+					try:
+						normalized = wf.tokenizeExpression(expr)
+					except KeyError:
+						getScopeVars = True
+				else:
 					getScopeVars = True
 
 			elif lastStat['openName'] == 'expression':
@@ -171,8 +175,6 @@ class WittyProject:
 					normalized = wf.tokenizeExpression(expr)
 				else:
 					getScopeVars = True
-
-			pr(normalized)
 
 			if normalized:
 				normalized = wf.tokenizeExpression(expr)

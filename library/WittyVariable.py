@@ -60,18 +60,11 @@ class WittyVariable:
 		if variable['docblock']:
 			self.setDocblock(variable['docblock'])
 
-		pr('Checking type: ' + str(self.type))
-
 		if not self.type or self.type in ['undefined', 'unknown']:
-
-			pr(variable)
 
 			if variable['value'] and 'result' in variable['value']:
 				# See if there is a value assignment
 				value = variable['value']['result']['text']
-
-				pr('>>>>>>>>')
-				pr(value)
 
 				if value[0] == '"' or value[0] == "'":
 					self.type = 'String'
@@ -129,9 +122,6 @@ class WittyVariable:
 	## Add a property to this variable
 	def addProperty(self, name, info):
 
-		pr('Adding prop ' + name)
-		pr(info)
-		
 		if name in self.properties:
 			prop = self.properties[name]
 

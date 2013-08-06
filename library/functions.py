@@ -1099,6 +1099,7 @@ def extractExpression(text, scopeLevel, lineNr, currentId, startId = 0, hasBegun
 	currentDocblock = False
 	isAssignment = False
 	justFoundDb = False
+	terminated = False
 
 	# Extra extractions
 	extras = []
@@ -1118,6 +1119,7 @@ def extractExpression(text, scopeLevel, lineNr, currentId, startId = 0, hasBegun
 			waitingForOperand = True
 
 		if c == ';':
+			terminated = True
 			break
 
 		if c == ',':
@@ -1270,7 +1272,7 @@ def extractExpression(text, scopeLevel, lineNr, currentId, startId = 0, hasBegun
 
 	result = {'assignment': isAssignment, 'text': result.strip(), 'functions': extras, 'docblock': currentDocblock, 'scope': scopeLevel}
 
-	return {'scope': scopeLevel, 'line': lineNr, 'newLines': newLines, 'openType': 'expression', 'openName': 'expression', 'result': result, 'beginId': currentId, 'endId': endId, 'functions': extras}
+	return {'scope': scopeLevel, 'line': lineNr, 'newLines': newLines, 'openType': 'expression', 'openName': 'expression', 'result': result, 'beginId': currentId, 'endId': endId, 'functions': extras, 'terminated': terminated}
 
 
 class Statement:
