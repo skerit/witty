@@ -6,12 +6,22 @@ def warn(message, showStack = True): wf.warn(message, showStack, 3)
 def info(message, showStack = True): wf.info(message, showStack, 3)
 def pr(message, showStack = True): wf.pr(message, showStack, 3)
 
+# Match descriptions
+reDescription = re.compile('\/\*(.*?)[@|\/]', re.M|re.S)
+
+# Docblock properties
+reAt = re.compile('^.*?@(\w+)?[ \t]*(.*)', re.M)
+
 #
 # The DocBlock class
 #
 class Docblock:
 
 	def __init__(self, text):
+		
+		if not text:
+			text = ''
+
 		self.original = text
 		self.description = self.parseDescription()
 		self.properties = self.parseProperties()
@@ -19,7 +29,7 @@ class Docblock:
 	# Get the description inside the given docblock text
 	def parseDescription(self):
 		text = self.original
-		description = wf.reDescription.match(text)
+		description = reDescription.match(text)
 
 		if description:
 			description = description.group(1)
@@ -31,7 +41,7 @@ class Docblock:
 	# Get all the properties of a docblock
 	def parseProperties(self):
 		text = self.original
-		match = wf.reAt.findall(text)
+		match = reAt.findall(text)
 		properties = {}
 
 		for match_tupple in match:
@@ -51,8 +61,21 @@ class Docblock:
 		
 		return []
 
+	# Get the type property
+	def getType(self):
+		result = self.getAttribute('type')
+
+		if result:
+			result = re.sub('{', '', result)
+			result = re.sub('}', '', result)
+			
+		return result
+
 	# Parse a simple attribute
 	def parseAttribute(self, text):
+
+		if isinstance(text, list):
+			text = text[0]
 
 		# Remove all double whitespaces
 		text = re.sub('\s+', ' ', text)

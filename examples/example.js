@@ -1,40 +1,48 @@
+/**
+ * @type {Number}
+ */
+var multiline = 1,
+
+	/**
+	 * @type {Number}
+	 */
+    declaration = 2,
+
+	/**
+	 * @type {Number}
+	 */
+    are = 3,
+
+	/**
+	 * @type {Number}
+	 */
+    go;
+
+
+go.myproperty = 1;
+go.another = 1;
 
 /**
- * A testing Property
- *
- * @typename Person
- * 
- * @param    {string}   firstname   The name of this person
- * @param    {number}   age         The age of this person
- *
- * @property {string}   firstname   The name of this person
+ * @type {Number}
  */
-var Person = function(firstname, age) {
+go.another.test = 1;
 
-	this.firstname = firstname;
-	
+/**
+ * @param   {Number}   myparam   The parameter
+ */
+function Class2 (myparam) {
+	this.test = 1;
+
+
+
 }
 
-var thisIsNotAGlobal = 10;
+Class2.test = 1;
 
-var multi, variable, declaration = true,
-    over = 'multiple', lines;
 
-function(){
-	var thisIsAScopeVar = 10;
-	var andWontBeVisibleOutsideThisFunction = true;
+var copy = Class2;
 
-	var bb = function bla(){
+var bt = true;
 
-	}
-}
-
-// These are multiple statements on one line
-var stest = ';;;';var we = 'are';var declaring = 'multiple';var statements = 'on one line';
-
-// An object
-var simpleObject = {
-	key: 'test',
-	second: 'value'
-}
+var copybt = bt;
 

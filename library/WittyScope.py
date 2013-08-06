@@ -172,7 +172,7 @@ class WittyScope:
 	#  @param   self        The object pointer
 	#  @param   statement   A WittyStatement
 	#  @param   variable    The variable
-	def addVariable(self, statement, variable = None):
+	def addVariable(self, statement, variable = None, defaults = {}):
 
 		# If variable is undefined, use the statement
 		if not variable:
@@ -181,18 +181,20 @@ class WittyScope:
 			return
 
 		# Has this variable been declared inside this scope?
-		declared = statement.declaration
+		if 'declared' in variable:
+			declared = variable['declared']
+		elif 'declared' in defaults:
+			declared = defaults['declared']
+		else:
+			declared = True
 
 		# Is there an existing variable in upper scopes?
 		existingVar = None
 
-		match = wf.reValidNameWithPoints.match(variable['name'])
-
-		if not match:
-			return
-
 		# The scope to use later on (self by default)
 		useScope = self
+
+		#pr('Adding variable to scope ' + str(self.id) + ' called "' + variable['name'] + '" declared: ' + str(declared))
 
 		# If this is not a declaration (with var)
 		# we must see if it's an existing variable
@@ -204,7 +206,14 @@ class WittyScope:
 			# If it's an existing var, add an appearance
 			if existingVar:
 				existingVar.addAppearance(statement, self)
+				# Add possible properties
+				existingVar.touchProperties(variable['properties'])
+				return existingVar
 			else:
+
+				# Create a new empty variable (with the id set)
+				newVar = self.project.intel.createEmptyVariable()
+
 				# @todo: In node.js you can't set something to the global by just omitting var
 				# So we'll have to find something for that
 				# Set the scope to the root scope (global)
@@ -215,12 +224,18 @@ class WittyScope:
 
 				# If it has not been found, raise an error
 				if not useScope: raise Exception('FileScope not found')
+		else:
+			existingVar = self.findVariable(variable['name'], True)
 
-		# Create a new empty variable (with the id set)
-		newVar = self.project.intel.createEmptyVariable()
+			if existingVar:
+				newVar = existingVar
+			else:
+				newVar = self.project.intel.createEmptyVariable()
 
 		# Set the scope
 		newVar.setScope(useScope)
+
+		newVar.setBase(variable)
 
 		# Set the statement
 		newVar.setStatement(statement)
@@ -228,11 +243,11 @@ class WittyScope:
 		# Set the name
 		newVar.setName(variable['name'])
 
-		if useScope.root:
-			print('Registering "' + variable['name'] +'" to scope "' + str(useScope.name) + '"')
-
 		# Add it to the correct scope
 		useScope.registerVariable(newVar)
+
+		# Add possible properties
+		newVar.touchProperties(variable['properties'])
 
 		return newVar
 

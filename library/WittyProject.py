@@ -4,6 +4,8 @@ from Witty.library.WittyScope import WittyScope
 from Witty.library.WittyScope import WittyRoot
 from Witty.library.WittyParser import WittyParser
 from Witty.library.WittyVariable import WittyVariable
+from Witty.library.WittyFile import WittyFile
+import os
 
 # Debug wrappers
 def warn(message, showStack = True): wf.warn(message, showStack, 3)
@@ -38,7 +40,7 @@ class WittyProject:
 		
 	# Begin parsing files
 	def parseFiles(self, savedFileName = ''):
-
+		
 		# If a thread is already running: stop it
 		if self.id in parserThreads and parserThreads[self.id]:
 			print('Killing running thread')
@@ -92,7 +94,7 @@ class WittyProject:
 		lines = []
 
 		for l in to_cursor_lines:
-			lines.append(view.substr(l).strip())
+			lines.append(wf.removeComment(view.substr(l).strip()))
 
 		stack = []
 		oBraces = 0
@@ -139,19 +141,107 @@ class WittyProject:
 		# Get the line after the cursor
 		right_line = full_line[col:].strip()
 
+		# All lines to the cursor
+		text = '\n'.join(lines)
+
 		# Get the better prefix
 		brefix = wf.getBetterPrefix(left_line)
+
+		stats = wf.splitStatements(text, 0)
+		lastStat = stats[len(stats)-1]
 
 		scope = self.getScope(current_file, function_scope)
 
 		if scope:
-			completions = []
 
-			variables = scope.getAllVariables()
+			getScopeVars = False
+			normalized = False
+
+			if lastStat['openName'] == 'var':
+				lastExpr = lastStat['result'][len(lastStat['result'])-1]
+				expr = lastExpr['expression']['result']['text']
+
+				# Only get more info if the last expression hasn't been terminated!
+				if not lastExpr['expression']['terminated']:
+					try:
+						normalized = wf.tokenizeExpression(expr)
+					except KeyError:
+						getScopeVars = True
+				else:
+					getScopeVars = True
+
+			elif lastStat['openName'] == 'expression':
+				expr = lastStat['result']['text']
+
+				if expr:
+					normalized = wf.tokenizeExpression(expr)
+				else:
+					getScopeVars = True
+
+			if normalized:
+				normalized = wf.tokenizeExpression(expr)
+
+				temp = expr.replace(' ', '')
+				temp = temp.replace('\n', '')
+				temp = temp.replace('\t', '')
+
+				endsWithMember = False
+
+				if temp.endswith('.') or temp.endswith('['):
+					endsWithMember = True
+
+				active = {}
+				
+				for token in normalized:
+
+					if not token['type']:
+						active = {}
+						continue
+
+					if 'member' in token and not token['member']:
+						active = {}
+						active['name'] = token['text']
+						active['properties'] = []
+					else:
+						active['properties'].append(token['text'])
+
+				if 'properties' in active and not endsWithMember and len(active['properties']):
+					del active['properties'][len(active['properties'])-1]
+
+				pr('>> Active found:')
+				pr(active)
+
+
+				if 'name' in active:
+					foundVar = scope.findVariable(active['name'])
+
+					if foundVar:
+						variables = foundVar.properties
+
+						for prop in active['properties']:
+							
+							if foundVar and prop in foundVar.properties:
+								foundVar = foundVar.properties[prop]
+
+						variables = foundVar.properties
+					else:
+						getScopeVars = True
+				else:
+					getScopeVars = True
+			else:
+				getScopeVars = True
+				pr(lastStat)
+				pr('<<<<<<<<<<<<<<<<')
+
+			if getScopeVars:
+				variables = scope.getAllVariables()
+
+			completions = []
 
 			for varname, varinfo in variables.items():
 				pr(varinfo.__dict__)
-				completions.append((varname, varname))
+				pr('Found variable inside scope ' + str(varinfo.scope.id) + ' called "' + varinfo.name + '"')
+				completions.append((varname + '\t' + str(len(varinfo.propArray)) + '\t' + str(varinfo.type), varname))
 
 			# INHIBIT_WORD_COMPLETIONS = 8 = Only show these completions
 			# INHIBIT_EXPLICIT_COMPLETIONS = 16 = ?
@@ -159,6 +249,8 @@ class WittyProject:
 		else:
 
 			info('Scope "' + function_scope + '" in file ' + current_file + ' was not found')
+
+			wittyOnly = True
 
 			if wittyOnly:
 				# We only want witty results, so make sure sublime doesn't interfere
@@ -183,6 +275,12 @@ class WittyProject:
 			# Create a new intel object
 			self.intel = Intel(self)
 
+			# Load in the json files!
+			CORE = WittyFile(self, 'CORE', True)
+			CORE.loadFiles(os.path.join(sublime.packages_path(), "Witty", "core"))
+
+			self.intel.files['CORE_FILE_WITTY'] = CORE
+
 			# The jar is empty, so start the parser, but return an empty dict
 			self.parseFiles()
 
@@ -192,6 +290,9 @@ class WittyProject:
 		info('Unpickling project ' + str(self.id) + ' data')
 
 		data = {}
+
+		# @todo: reenable pickling
+		return data
 
 		# Load in existing completions previously stored
 		try:
@@ -271,8 +372,6 @@ class Intel:
 			# Make a temporary map of the scopes inside this file
 			scopeMap = {1: fileScope}
 
-			print('there are ' + str(len(wittyFile.scopes)) + ' scopes')
-
 			# Loop over every scope
 			for scope in wittyFile.scopes:
 
@@ -289,12 +388,27 @@ class Intel:
 
 				scopeMap[scope['id']] = newScope
 
-			#print(wittyFile.scopes)
+			#for statement in wittyFile.statements:
+			#	pr('Adding statement ' + statement.typeName + ' from line ' + str(statement.lineNr) + ' to scope ' + str(statement.scopeId))
 
 			for statement in wittyFile.statements:
 				# Get the statement's scope
 				statementScope = scopeMap[statement.scopeId]
 				statementScope.addVariable(statement)
+
+			for scope in wittyFile.scopes:
+				if scope['id'] == 0:
+					targetScope = self.root
+				else:
+					targetScope = scopeMap[scope['id']]
+
+				for name, varinfo in scope['variables'].items():
+					targetScope.addVariable(False, varinfo)
+
+				wf.log(scope, 'witty-simplescopes', True)
+
+			for i, scope in scopeMap.items():
+				wf.log(scope, 'witty-WTScopes')
 
 			self.registerTypes()
 
@@ -309,7 +423,7 @@ class Intel:
 		# Register all the new types
 		for variable in self.variables:
 
-			if variable.statement.hasAttribute('typename'):
+			if variable.statement and variable.statement.hasAttribute('typename'):
 
 				# Register them for every name given
 				for name in variable.statement.name:
@@ -347,7 +461,9 @@ class Intel:
 			wf.warn('File "' + filename + '" was not found while looking for scope "' + scopename + '"')
 			return False
 		else:
+			pr('Filename scopes:')
 			for scope in self.scopesByFilename[filename]:
+				pr(scope.__dict__)
 				if scope.name == scopename:
 					return scope
 

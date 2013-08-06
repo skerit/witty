@@ -1,0 +1,115 @@
+{
+	"Object": {
+		"description": null,
+		"name": "Object",
+		"type": "Object",
+		"properties": {
+			"create": {
+				"description": "Creates a new object with the specified prototype object and properties.",
+				"name": "create",
+				"type": "Function"
+			},
+			"defineProperty": {
+				"description": "Adds the named property described by a given descriptor to an object.",
+				"name": "defineProperty",
+				"type": "Function"
+			},
+			"defineProperties": {
+				"description": "Adds the named properties described by the given descriptors to an object.",
+				"name": "defineProperties",
+				"type": "Function"
+			},
+			"getOwnPropertyDescriptor": {
+				"description": "Returns a property descriptor for a named property on an object.",
+				"name": "getOwnPropertyDescriptor",
+				"type": "Function"
+			},
+			"keys": {
+				"description": "Returns an array containing the names of all of the given object's own enumerable properties.",
+				"name": "keys",
+				"type": "Function"
+			},
+			"getOwnPropertyNames": {
+				"description": "Returns an array containing the names of all of the given object's own enumerable and non-enumerable properties.",
+				"name": "getOwnPropertyNames",
+				"type": "Function"
+			},
+			"getPrototypeOf": {
+				"description": "Returns the prototype of the specified object.",
+				"name": "getPrototypeOf",
+				"type": "Function"
+			},
+			"preventExtensions": {
+				"description": "Prevents any extensions of an object.",
+				"name": "preventExtensions",
+				"type": "Function"
+			},
+			"isExtensible": {
+				"description": "Determine if extending of an object is allowed.",
+				"name": "isExtensible",
+				"type": "Function"
+			},
+			"seal": {
+				"description": "Prevents other code from deleting properties of an object.",
+				"name": "seal",
+				"type": "Function"
+			},
+			"isSealed": {
+				"description": "Determine if an object is sealed.",
+				"name": "isSealed",
+				"type": "Function"
+			},
+			"freeze": {
+				"description": "Freezes an object: other code can't delete or change any properties.",
+				"name": "freeze",
+				"type": "Function"
+			},
+			"isFrozen": {
+				"description": "Determine if an object was frozen.",
+				"name": "isFrozen",
+				"type": "Function"
+			},
+			"prototype": {
+				"name": "prototype",
+				"type": "Function",
+				"properties": {
+					"constructor": {
+						"description": "Specifies the function that creates an object's prototype.",
+						"name": "constructor",
+						"type": "Function"
+					},
+					"hasOwnProperty": {
+						"description": "Returns a boolean indicating whether an object contains the specified property as a direct property of that object and not inherited through the prototype chain.",
+						"name": "hasOwnProperty",
+						"type": "Function"
+					},
+					"isPrototypeOf": {
+						"description": "The name of the function.",
+						"name": "isPrototypeOf",
+						"type": "Function"
+					},
+					"propertyIsEnumerable": {
+						"description": "Returns a boolean indicating if the internal ECMAScript DontEnum attribute is set.",
+						"name": "propertyIsEnumerable",
+						"type": "Function"
+					},
+					"toLocaleString": {
+						"description": "Calls toString.",
+						"name": "toLocaleString",
+						"type": "Function"
+					},
+					"toString": {
+						"description": "Returns a string representation of the object.",
+						"name": "toString",
+						"type": "Function"
+					},
+					"valueOf": {
+						"description": "Returns the primitive value of the specified object.",
+						"name": "valueOf",
+						"type": "Function"
+					}
+				}
+			}
+		}
+	}
+}
