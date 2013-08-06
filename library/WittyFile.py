@@ -1,4 +1,6 @@
 import re
+import os
+import json
 import Witty.library.functions as wf
 from Witty.library.WittyStatement import WittyStatement
 from Witty.library.Docblock import Docblock
@@ -10,7 +12,7 @@ def pr(message, showStack = True): wf.pr(message, showStack, 3)
 
 class WittyFile:
 
-	def __init__(self, project, fileName):
+	def __init__(self, project, fileName, core = False):
 
 		# The project we're modifying
 		self.project = project
@@ -18,18 +20,6 @@ class WittyFile:
 		# The filename
 		self.fileName = fileName
 		self.name = fileName
-
-		# Open the original file
-		fileHandle = open(fileName, 'rU')
-
-		# Read in the original file
-		self.original = fileHandle.read()
-
-		# The array
-		self.fileArray = self.original.split('\n')
-
-		# Close the file
-		fileHandle.close()
 
 		# Set the working string to empty
 		self.working = ''
@@ -51,21 +41,52 @@ class WittyFile:
 
 		self.root = {}
 
-		# Recursively split all the statements
-		splitStatements = wf.splitStatements(self.original, 1)
-		self.objStatements = self.parseStatements(splitStatements, 1)
+		# Open the original file
+		if not core:
+			fileHandle = open(fileName, 'rU')
 
-		wf.log(self.scopes, 'scopes')
-		wf.log({fileName: splitStatements, 'scopes': self.scopes})
-		wf.log(self.objStatements, 'witty-objstatements')
+			# Read in the original file
+			self.original = fileHandle.read()
 
-		# Recursively go through all the statements in this file
-		for stat in self.objStatements:
-			WittyStatement(self, stat)
+			# The array
+			self.fileArray = self.original.split('\n')
 
-		for s in self.statements:
-			wf.log(s, 'witty-statements')
+			# Close the file
+			fileHandle.close()
 
+			# Recursively split all the statements
+			splitStatements = wf.splitStatements(self.original, 1)
+			self.objStatements = self.parseStatements(splitStatements, 1)
+
+			wf.log(self.scopes, 'scopes')
+			wf.log({fileName: splitStatements, 'scopes': self.scopes})
+			wf.log(self.objStatements, 'witty-objstatements')
+
+			# Recursively go through all the statements in this file
+			for stat in self.objStatements:
+				WittyStatement(self, stat)
+
+			for s in self.statements:
+				wf.log(s, 'witty-statements')
+
+	# Load in json files
+	def loadFiles(self, directory, scopeId = 0):
+
+		targetScope = self.scopes[scopeId]
+
+		pr('\n\n\n>>>>>>>> Loading files!')
+		for root, dirs, files in os.walk(directory, topdown=True):
+			for fileName in files:
+				filePath = os.path.join(root, fileName)
+				tempFile = open(filePath, 'rU')
+				json_data = tempFile.read()
+
+				try:
+					data = json.loads(json_data)
+					targetScope['variables'].update(data)
+				except ValueError:
+					pr('Error decoding JSON file ' + filePath)
+				tempFile.close()
 
 	# Parsing statements begins here
 	def parseStatements(self, workingStatements, scopeId = 1):

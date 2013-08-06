@@ -46,5 +46,3 @@ var bt = true;
 
 var copybt = bt;
 
-
-

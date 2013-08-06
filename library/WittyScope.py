@@ -172,7 +172,7 @@ class WittyScope:
 	#  @param   self        The object pointer
 	#  @param   statement   A WittyStatement
 	#  @param   variable    The variable
-	def addVariable(self, statement, variable = None):
+	def addVariable(self, statement, variable = None, defaults = {}):
 
 		# If variable is undefined, use the statement
 		if not variable:
@@ -181,7 +181,12 @@ class WittyScope:
 			return
 
 		# Has this variable been declared inside this scope?
-		declared = variable['declared']
+		if 'declared' in variable:
+			declared = variable['declared']
+		elif 'declared' in defaults:
+			declared = defaults['declared']
+		else:
+			declared = True
 
 		# Is there an existing variable in upper scopes?
 		existingVar = None

@@ -4,6 +4,8 @@ from Witty.library.WittyScope import WittyScope
 from Witty.library.WittyScope import WittyRoot
 from Witty.library.WittyParser import WittyParser
 from Witty.library.WittyVariable import WittyVariable
+from Witty.library.WittyFile import WittyFile
+import os
 
 # Debug wrappers
 def warn(message, showStack = True): wf.warn(message, showStack, 3)
@@ -273,6 +275,12 @@ class WittyProject:
 			# Create a new intel object
 			self.intel = Intel(self)
 
+			# Load in the json files!
+			CORE = WittyFile(self, 'CORE', True)
+			CORE.loadFiles(os.path.join(sublime.packages_path(), "Witty", "core"))
+
+			self.intel.files['CORE_FILE_WITTY'] = CORE
+
 			# The jar is empty, so start the parser, but return an empty dict
 			self.parseFiles()
 
@@ -389,6 +397,14 @@ class Intel:
 				statementScope.addVariable(statement)
 
 			for scope in wittyFile.scopes:
+				if scope['id'] == 0:
+					targetScope = self.root
+				else:
+					targetScope = scopeMap[scope['id']]
+
+				for name, varinfo in scope['variables'].items():
+					targetScope.addVariable(False, varinfo)
+
 				wf.log(scope, 'witty-simplescopes', True)
 
 			for i, scope in scopeMap.items():
@@ -407,7 +423,7 @@ class Intel:
 		# Register all the new types
 		for variable in self.variables:
 
-			if variable.statement.hasAttribute('typename'):
+			if variable.statement and variable.statement.hasAttribute('typename'):
 
 				# Register them for every name given
 				for name in variable.statement.name:

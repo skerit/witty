@@ -57,7 +57,7 @@ class WittyVariable:
 		self.info = variable
 		self.type = variable['type']
 
-		if variable['docblock']:
+		if 'docblock' in variable and variable['docblock']:
 			self.setDocblock(variable['docblock'])
 
 		if not self.type or self.type in ['undefined', 'unknown']:
@@ -151,5 +151,6 @@ class WittyVariable:
 			self.properties[name] = prop
 			self.propArray.append(prop)
 
-		# Recursively add deeper properties
-		prop.touchProperties(info['properties'])
+		if 'properties' in info:
+			# Recursively add deeper properties
+			prop.touchProperties(info['properties'])
