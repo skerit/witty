@@ -232,7 +232,7 @@ class WittyScope:
 			if existingVar:
 				existingVar.addAppearance(statement, self)
 				# Add possible properties
-				existingVar.touchProperties(variable['properties'])
+				existingVar.touchProperties(variable['properties'], statement)
 				return existingVar
 			else:
 
@@ -264,9 +264,6 @@ class WittyScope:
 
 		# Set the statement
 		newVar.setStatement(statement)
-
-		# Set the name
-		newVar.setName(variable['name'])
 
 		# Add it to the correct scope
 		useScope.registerVariable(newVar)

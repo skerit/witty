@@ -28,6 +28,7 @@ class WittyVariable:
 
 	docblock = None
 
+	name = None
 	type = None
 	types = None
 
@@ -123,7 +124,14 @@ class WittyVariable:
 		return variables
 
 	def setBase(self, variable):
+
+		# Store info
 		self.info = variable
+
+		if 'name' in variable:
+			self.setName(variable['name'])
+
+		# Set the type
 		self.setType(variable['type'])
 
 		if 'docblock' in variable and variable['docblock']:
@@ -131,9 +139,24 @@ class WittyVariable:
 
 		if not self.type or self.type in ['undefined', 'unknown']:
 
+			valueResult = None
+
 			if variable['value'] and 'result' in variable['value']:
+				valueResult = variable['value']['result']
+			elif self.statement:
+				# @todo: This shouldn't really go here, and be solved much earlier!
+				valueResult = self.statement.statement['result']
+				tempTest = valueResult['text'].replace('===', '_EQ_')
+				tempTest = tempTest.replace('==', '_EQ_')
+
+				if len(tempTest):
+					valueResult['text'] = tempTest[len(tempTest)-1].strip()
+				else:
+					valueResult = None
+
+			if valueResult:
 				# See if there is a value assignment
-				value = variable['value']['result']['text']
+				value = valueResult['text']
 
 				if not len(value):
 					pass # Do nothing if there is no text
@@ -148,20 +171,23 @@ class WittyVariable:
 				elif value.isdigit():
 					self.type = 'Number'
 				elif self.scope:
+
 					# See if it's an existing variable somewhere
 					existing = self.scope.findVariable(value)
 
 					if existing:
 						self.makeReference(existing)
 
-	# Make a reference to another variable
+	## Make a reference to the given variable
+	#  @param   self        The object pointer
+	#  @param   existing    The given variable
 	def makeReference(self, existing):
 
 		if existing.type in ['Function', 'Object', 'Array']:
 			self.properties = existing.properties
 			self.propArray = existing.propArray
 
-		self.type = existing.type
+		self.setType(existing.type)
 
 	## Set the name of this variable
 	#  @param   self        The object pointer
@@ -210,29 +236,31 @@ class WittyVariable:
 
 
 
-	def touchProperties(self, properties):
+	def touchProperties(self, properties, statement = None):
 
 		for name, prop in properties.items():
-			self.addProperty(prop['name'], prop)
+			self.addProperty(prop['name'], prop, statement)
 
 
 	## Add a property to this variable
-	def addProperty(self, name, info):
+	def addProperty(self, name, info, statement = None):
 
+		# If the property already exist, fetch it
 		if name in self.properties:
 			prop = self.properties[name]
 
 			# If there is a new type set
 			if info['type']:
 				prop.type = info['type']
-
 		else:
 			prop = WittyVariable()
 
 			# Add some basic info
 			prop.id = 0
 			prop.setScope(self.scope)
-			prop.setStatement(self.statement)
+
+			# Set the current statement
+			prop.setStatement(statement)
 
 			# Set the name
 			prop.setName(name)
@@ -243,6 +271,7 @@ class WittyVariable:
 			self.properties[name] = prop
 			self.propArray.append(prop)
 
+		# See if there are any sub properties we need to touch
 		if 'properties' in info:
 			# Recursively add deeper properties
-			prop.touchProperties(info['properties'])
+			prop.touchProperties(info['properties'], statement)
