@@ -148,35 +148,39 @@ class WittyProject:
 		brefix = wf.getBetterPrefix(left_line)
 
 		stats = wf.splitStatements(text, 0)
-		lastStat = stats[len(stats)-1]
+
+		if not len(stats):
+			lastStat = False
+		else:
+			lastStat = stats[len(stats)-1]
 
 		scope = self.getScope(current_file, function_scope)
 
 		if scope:
 
-			getScopeVars = False
+			getScopeVars = True
 			normalized = False
 
-			if lastStat['openName'] == 'var':
+			if lastStat and lastStat['openName'] == 'var':
 				lastExpr = lastStat['result'][len(lastStat['result'])-1]
-				expr = lastExpr['expression']['result']['text']
+				
+				if 'expression' in lastExpr:
+					expr = lastExpr['expression']['result']['text']
 
-				# Only get more info if the last expression hasn't been terminated!
-				if not lastExpr['expression']['terminated']:
-					try:
-						normalized = wf.tokenizeExpression(expr)
-					except KeyError:
-						getScopeVars = True
-				else:
-					getScopeVars = True
+					# Only get more info if the last expression hasn't been terminated!
+					if not lastExpr['expression']['terminated']:
+						try:
+							normalized = wf.tokenizeExpression(expr)
+							getScopeVars = False
+						except KeyError:
+							pass
 
-			elif lastStat['openName'] == 'expression':
+			elif lastStat and lastStat['openName'] == 'expression':
 				expr = lastStat['result']['text']
 
 				if expr:
 					normalized = wf.tokenizeExpression(expr)
-				else:
-					getScopeVars = True
+					getScopeVars = False
 
 			if normalized:
 				normalized = wf.tokenizeExpression(expr)
@@ -219,14 +223,15 @@ class WittyProject:
 
 						# See if we need to get a property of this var
 						if active['properties']:
+							pr('Looking for properties')
+							pr(active['properties'])
 							temp = foundVar.findProperties(active['properties'])
 							if temp: foundVar = temp
 
-						pr(foundVar.getAttribute('class'))
-						pr(foundVar.docblock)
-
 						# Make a copy of the foundVar properties
 						variables = foundVar.getProperties()
+
+						getScopeVars = False
 
 						# # Now get the prototype properties of the foundVar's type
 						# if foundVar.types:
@@ -243,17 +248,20 @@ class WittyProject:
 						# 	# Now overwrite anything with our own properties
 						# 	variables.update(foundVar.properties)
 
-					else:
-						getScopeVars = True
-				else:
-					getScopeVars = True
 			else:
 				getScopeVars = True
 				pr(lastStat)
 				pr('<<<<<<<<<<<<<<<<')
 
+			# If variables isn't defined, get all the scope variables
+			try:
+				variables
+			except NameError:
+				getScopeVars = True
+
 			if getScopeVars:
 				variables = scope.getAllVariables()
+
 
 			completions = []
 

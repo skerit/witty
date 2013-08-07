@@ -82,7 +82,7 @@ class WittyVariable:
 			typeVar = self.scope.findVariable(typeName)
 
 			# Update the result value with the found prototype properties
-			variables.update(typeVar.getPrototypeProperties())
+			if typeVar: variables.update(typeVar.getPrototypeProperties())
 		
 		return variables
 

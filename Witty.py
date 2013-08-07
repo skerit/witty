@@ -56,6 +56,11 @@ def clear_types_file(filename):
 		if value['filename'] == filename:
 			del allTypes[key]
 
+pr('\n\n\n\n\n\n\n\n\n')
+pr('                     ===========================================')
+pr('                     Reloaded WITTY')
+pr('                     ===========================================')
+pr('\n\n\n\n\n\n\n\n\n')
 
 # The Witty entrance
 class WittyCommand(sublime_plugin.EventListener):

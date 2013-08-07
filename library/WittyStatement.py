@@ -155,6 +155,12 @@ class WittyStatement:
 		targetVar = False
 
 		for target in expression['target']:
+
+			if not 'name' in target:
+				pr('Missing name in target:')
+				pr(target)
+				continue
+
 			targetVar = self.touchVar(target['name'])
 
 			prop = targetVar

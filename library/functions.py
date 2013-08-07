@@ -294,8 +294,8 @@ def hasWordNext(text, word, id = False):
 def hasCharsNext(text, word, id = False, checkForSpace = False):
 	return _hasChars(text, word, id, False, not checkForSpace)
 
-def hasCharsAfter(text, word, id = False, ignoreEndWhitespace = True):
-	return _hasChars(text, word, id, True, ignoreEndWhitespace)
+def hasCharsAfter(text, word, id = False, ignoreEndWhitespace = True, returnId = False):
+	return _hasChars(text, word, id, True, ignoreEndWhitespace, returnId)
 
 def _hasChars(text, word, id = False, ignoreBeginningWhitespace = True, ignoreEndWhitespace = True, returnId = False, returnWord = False):
 
@@ -319,7 +319,7 @@ def _hasChars(text, word, id = False, ignoreBeginningWhitespace = True, ignoreEn
 
 		try:
 			# If we should ignore the beginning space, recurse
-			if ignoreBeginningWhitespace and text[id] in whitespace:
+			if ignoreBeginningWhitespace and text[0] in whitespace:
 				return _hasChars(originalText, word, id+1, ignoreBeginningWhitespace, ignoreEndWhitespace, returnId, returnWord)
 
 		except IndexError:
@@ -1455,6 +1455,8 @@ class Statement:
 			dbPrevEnd = 0
 			dbPrevLines = 0
 
+			tempResult = None
+
 			# See what we have to do next
 			while True:
 
@@ -1478,8 +1480,15 @@ class Statement:
 						extractions['docblock'] = foundDocblock
 					continue
 
+				# Remove inline comments
+				inlineComment = hasCharsAfter(text, '//', id, True, True)
+				if inlineComment > -1:
+					nextNL = getNextCharId(text, '\n', inlineComment)
+					id = nextNL+1
+					continue
+
 				position += 1
-				
+
 				if self.grouping and text[id] == self.grouping:
 
 					# Add the previous extractions to the group
@@ -1531,10 +1540,7 @@ class Statement:
 					#(result, endId, newLines) = extractExpression(text, scopeLevel, lineNr+newLines, id, expressionHasBegun, waitingForOperand)
 					result = extractExpression(text, scopeLevel, lineNr, beginId, id, expressionHasBegun, waitingForOperand)
 
-					if scopeLevel == 1: pr(result)
-					if scopeLevel == 1: pr({'text': text[id:], 'id': id})
-					
-					
+					pr(result)
 
 					# If the extracted expression is an empty string... 
 					# Well then we didn't extract anything and we should discard it
@@ -1588,7 +1594,9 @@ class Statement:
 						
 						# If there is no block, get the first expression
 						if not hasCharsAfter(rest, '{'):
-							tempBeginId = tempResult['beginId']
+							if tempResult:
+								tempBeginId = tempResult['beginId']
+
 							tempResult = extractExpression(rest, scopeLevel, lineNr, id+beginId, 0, True, True)
 							result = tempResult['result']['text']
 							endId = tempResult['endId']
@@ -1660,6 +1668,9 @@ class Statement:
 
 					break
 
+				pr('Id at end of iteration is ' + str(id))
+				pr({'next': text[id:]})
+
 				foundDocblock = False
 
 			if self.grouping:
@@ -1691,9 +1702,8 @@ def determineOpen(text, scopeLevel, lineNr, id, currentId = 0):
 		else:
 			if hasWordNext(text, stat.begins):
 				if scopeLevel == 1: pr('Extracting ' + stat.name)
+				pr({'text': text, 'currentId': currentId})
 				return stat.extract(text, scopeLevel, lineNr, currentId)
-
-	pr('Expression:')
 
 	# It wasn't a statement, so try getting the expression
 	return extractExpression(text, scopeLevel, lineNr, currentId, 0)
@@ -1732,7 +1742,12 @@ def splitStatements(text, scopeLevel, lineNr = 1, curId = 0):
 
 			result = determineOpen(text, scopeLevel, lineNr, id, id+curId)
 
-			if scopeLevel == 1: pr(result)
+			if scopeLevel == 1:
+				pr(result)
+				if result['beginId'] == 24097:
+					pr('Error in text:')
+					pr(text)
+					die()
 
 			if result:
 
