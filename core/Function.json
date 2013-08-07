@@ -2,7 +2,7 @@
 	"Function": {
 		"description": null,
 		"name": "Function",
-		"type": "Function",
+		"type": "Function,Object",
 		"properties": {
 			"prototype": {
 				"name": "prototype",

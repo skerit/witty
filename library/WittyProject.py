@@ -216,14 +216,33 @@ class WittyProject:
 					foundVar = scope.findVariable(active['name'])
 
 					if foundVar:
-						variables = foundVar.properties
 
-						for prop in active['properties']:
-							
-							if foundVar and prop in foundVar.properties:
-								foundVar = foundVar.properties[prop]
+						# See if we need to get a property of this var
+						if active['properties']:
+							temp = foundVar.findProperties(active['properties'])
+							if temp: foundVar = temp
 
-						variables = foundVar.properties
+						pr(foundVar.getAttribute('class'))
+						pr(foundVar.docblock)
+
+						# Make a copy of the foundVar properties
+						variables = foundVar.getProperties()
+
+						# # Now get the prototype properties of the foundVar's type
+						# if foundVar.types:
+						# 	# Create empty object
+						# 	variables = {}
+
+						# 	for typeName in foundVar.types:
+						# 		pr('Looking for ' + typeName)
+						# 		typeVar = scope.findVariable(typeName)
+
+						# 		if 'prototype' in typeVar.properties:
+						# 			variables.update(typeVar.properties['prototype'].properties)
+
+						# 	# Now overwrite anything with our own properties
+						# 	variables.update(foundVar.properties)
+
 					else:
 						getScopeVars = True
 				else:

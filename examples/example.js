@@ -29,15 +29,15 @@ go.another.test = 1;
 
 /**
  * @param   {Number}   myparam   The parameter
+ * @class 1
  */
 function Class2 (myparam) {
 	this.test = 1;
 
-
-
 }
 
 Class2.test = 1;
+Class2.prototype.PROT = 1;
 
 
 var copy = Class2;
@@ -45,4 +45,9 @@ var copy = Class2;
 var bt = true;
 
 var copybt = bt;
+
+/**
+ * @type {Class2}
+ */
+var ctest;
 

@@ -122,17 +122,42 @@ class WittyScope:
 	#  @param   self     The object pointer
 	#  @param   name     The variable name
 	#  @param   local    Only look in this scope?
-	def findVariable(self, name, local = False):
+	def findVariable(self, names, local = False):
+
+		# Main variable result
+		var = False
+
+		# Split the name
+		pieces = names.split('.')
+
+		# Get the first entry in the array, that's the main variable
+		name = pieces.pop(0)
 
 		# If the variable is found, return it
 		if name in self.variables:
-			return self.variables[name]
+			var = self.variables[name]
 
 		# If we should not restrict ourselves to the local scope
-		if not local and self.parent:
-			return self.parent.findVariable(name)
+		elif not local and self.parent:
+			var = self.parent.findVariable(name)
+
+		if var:
+			# If there are more pieces, look deeper
+			if len(pieces):
+				return var.findProperties(pieces)
+			else:
+				return var
 
 		return False
+
+	## Find a variable in this or children scopes
+	def findVariableDown(self, name, local = False, skipScopeId = False):
+
+		# If the variable is found in this scope, return it
+		if name in self.variables:
+			return self.variables[name]
+
+		## @todo: Should this go down first and up later?
 
 	## Get all variables
 	#  @param   self     The object pointer

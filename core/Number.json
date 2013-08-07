@@ -43,6 +43,42 @@
 				"description": "Determine whether the type of the passed value is \"number\" and the passed value is an integer.",
 				"name": "isInteger",
 				"type": "Function"
+			},
+			"prototype": {
+				"name": "prototype",
+				"type": "Function",
+				"properties": {
+					"toExponential": {
+						"description": "Returns a string representing the number in exponential notation.",
+						"name": "toExponential",
+						"type": "Function"
+					},
+					"toFixed": {
+						"description": "Returns a string representing the number in fixed-point notation.",
+						"name": "toFixed",
+						"type": "Function"
+					},
+					"toLocaleString": {
+						"description": "Returns a string with a language sensitive representation of this number. Overrides the Object.prototype.toLocaleString method.",
+						"name": "toLocaleString",
+						"type": "Function"
+					},
+					"toPrecision": {
+						"description": "The name of the function.",
+						"name": "toPrecision",
+						"type": "Function"
+					},
+					"toString": {
+						"description": "Returns a string representing the specified object. Overrides the Object.prototype.toString method.",
+						"name": "toString",
+						"type": "Function"
+					},
+					"valueOf": {
+						"description": "Returns the primitive value of the specified object. Overrides the Object.prototype.valueOf method.",
+						"name": "valueOf",
+						"type": "Function"
+					}
+				}
 			}
 		}
 	}
