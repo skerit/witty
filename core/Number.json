@@ -64,18 +64,18 @@
 						"type": "Function"
 					},
 					"toPrecision": {
-						"description": "The name of the function.",
+						"description": "Returns a string representing the number to a specified precision in fixed-point or exponential notation.",
 						"name": "toPrecision",
-						"type": "Function"
-					},
-					"toString": {
-						"description": "Returns a string representing the specified object. Overrides the Object.prototype.toString method.",
-						"name": "toString",
 						"type": "Function"
 					},
 					"valueOf": {
 						"description": "Returns the primitive value of the specified object. Overrides the Object.prototype.valueOf method.",
 						"name": "valueOf",
+						"type": "Function"
+					},
+					"toString": {
+						"description": "Returns a string representing the source code of the function. Overrides the Object.toString method.",
+						"name": "toString",
 						"type": "Function"
 					}
 				}
