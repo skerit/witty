@@ -1386,8 +1386,6 @@ class Statement:
 
 	def extract(self, text, scopeLevel, lineNr, currentId, startId = 0):
 
-		a = datetime.datetime.now()
-
 		(text, exists) = shiftString(text, startId)
 
 		if text[0] in [' ', '\t', '\n']:
@@ -1457,12 +1455,24 @@ class Statement:
 
 			tempResult = None
 
+			antiInfinityCounter = 0
+
 			# See what we have to do next
 			while True:
 
 				# Have we reached the end of the string?
 				if id >= textLength:
 					break
+
+				pr({'antiInfinityCounter': antiInfinityCounter})
+
+				if antiInfinityCounter > 100:
+					pr('=============================')
+					pr('Infinite Loop Detected in ' + self.name + ' extraction')
+					pr('=============================')
+					break
+
+				antiInfinityCounter += 1
 
 				# Extract any docblocks in here
 				(dbResult, dbEndId, dbNewLines) = extractGreedy(text[id:], '/*', '*/', True)
@@ -1537,9 +1547,15 @@ class Statement:
 
 				elif targetName == 'expression':
 
+					if self.name == 'return':
+						expressionHasBegun = True
+
 					#(result, endId, newLines) = extractExpression(text, scopeLevel, lineNr+newLines, id, expressionHasBegun, waitingForOperand)
 					result = extractExpression(text, scopeLevel, lineNr, beginId, id, expressionHasBegun, waitingForOperand)
 
+					pr({'text': text[id:]})
+
+					pr('Getting target ' + targetName + ' for stat ' + self.name)
 					pr(result)
 
 					# If the extracted expression is an empty string... 
@@ -1561,6 +1577,9 @@ class Statement:
 
 						# Get the new rest
 						rest = text[id:]
+					else:
+						id += 1
+						lastTargetEnd = id
 
 				elif targetName == 'paren':
 
@@ -1680,8 +1699,7 @@ class Statement:
 			else:
 				result = extractions
 
-		b = datetime.datetime.now()
-		c = b - a
+		pr('RETURNING EXTRACT')
 
 		return {'scope': startScope, 'line': lineNr, 'newLines': newLines, 'openType': 'statement', 'openName': self.name, 'result': result, 'beginId': beginId, 'endId': beginId+lastTargetEnd-1}
 
