@@ -212,10 +212,6 @@ class WittyProject:
 				if 'properties' in active and not endsWithMember and len(active['properties']):
 					del active['properties'][len(active['properties'])-1]
 
-				pr('>> Active found:')
-				pr(active)
-
-
 				if 'name' in active:
 					foundVar = scope.findVariable(active['name'])
 
@@ -250,8 +246,6 @@ class WittyProject:
 
 			else:
 				getScopeVars = True
-				pr(lastStat)
-				pr('<<<<<<<<<<<<<<<<')
 
 			# If variables isn't defined, get all the scope variables
 			try:
@@ -266,8 +260,6 @@ class WittyProject:
 			completions = []
 
 			for varname, varinfo in variables.items():
-				pr(varinfo.__dict__)
-				pr('Found variable inside scope ' + str(varinfo.scope.id) + ' called "' + varinfo.name + '"')
 				completions.append((varname + '\t' + str(len(varinfo.propArray)) + '\t' + str(varinfo.type), varname))
 
 			# INHIBIT_WORD_COMPLETIONS = 8 = Only show these completions

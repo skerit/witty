@@ -149,9 +149,6 @@ class WittyStatement:
 		# Get the raw expression
 		expression = wf.normalizeExpression(self.statement['result']['text'])
 
-		pr(">> Expression name:")
-		pr(expression)
-		pr(self.statement)
 		targetVar = False
 
 		for target in expression['target']:
@@ -180,8 +177,6 @@ class WittyStatement:
 
 	# Process a var statement
 	def processVar(self):
-
-		#pr(self.statement)
 
 		# Go over every assignment
 		for index, entry in enumerate(self.statement['result']):
@@ -219,8 +214,6 @@ class WittyStatement:
 			scopeId = result['scopeId']
 		else:
 			scopeId = self.statement['subscopeId']
-
-		pr('>>>>>>>>>> Processing function!')
 
 		# Add the function variable to this scope
 		if not newVar and 'name' in result:

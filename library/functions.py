@@ -199,8 +199,6 @@ def pr(message, showStack = True, stackLevel = 2):
 #  @param   text
 def getBetterPrefix(text):
 
-	pr(text)
-
 	# Get everything after these chars, in this order
 	chars = [' ', '(', ')', '[', ']', '-', '+']
 
@@ -1150,8 +1148,6 @@ def extractExpression(text, scopeLevel, lineNr, currentId, startId = 0, hasBegun
 			# Look for a statement
 			(tempWord, tempId, tempNewLines) = extractStatementAfter(text, i)
 
-			pr(tempWord)
-
 		# A statement word was found
 		if tempWord:
 
@@ -1161,10 +1157,6 @@ def extractExpression(text, scopeLevel, lineNr, currentId, startId = 0, hasBegun
 
 				# Extract the function
 				tempResult = function.extract(text, scopeLevel, lineNr+newLines, i)
-
-				pr('>>>>>>>>>>>>>>> FUNCTION >>>>>>>>>>>>>>>>>>>>>')
-				pr(tempResult)
-				
 
 				extras.append(tempResult['result'])
 
@@ -1176,10 +1168,6 @@ def extractExpression(text, scopeLevel, lineNr, currentId, startId = 0, hasBegun
 
 				# Up the newline count
 				newLines += tempResult['newLines']
-
-				pr('-')
-				pr({'NEXT': text[skipToId:]})
-				pr('-')
 
 				waitingForOperand = False
 
@@ -1464,9 +1452,8 @@ class Statement:
 				if id >= textLength:
 					break
 
-				pr({'antiInfinityCounter': antiInfinityCounter})
-
 				if antiInfinityCounter > 100:
+					pr({'antiInfinityCounter': antiInfinityCounter})
 					pr('=============================')
 					pr('Infinite Loop Detected in ' + self.name + ' extraction')
 					pr('=============================')
@@ -1516,8 +1503,6 @@ class Statement:
 
 				(targetName, targetRequired, extraOptions) = self.getNextTarget(position)
 
-				pr('Getting target ' + str(targetName))
-
 				# If we did find a target, we don't need to worry about the db
 				if targetName:
 					dbFoundNow = False
@@ -1552,11 +1537,6 @@ class Statement:
 
 					#(result, endId, newLines) = extractExpression(text, scopeLevel, lineNr+newLines, id, expressionHasBegun, waitingForOperand)
 					result = extractExpression(text, scopeLevel, lineNr, beginId, id, expressionHasBegun, waitingForOperand)
-
-					pr({'text': text[id:]})
-
-					pr('Getting target ' + targetName + ' for stat ' + self.name)
-					pr(result)
 
 					# If the extracted expression is an empty string... 
 					# Well then we didn't extract anything and we should discard it
@@ -1687,9 +1667,6 @@ class Statement:
 
 					break
 
-				pr('Id at end of iteration is ' + str(id))
-				pr({'next': text[id:]})
-
 				foundDocblock = False
 
 			if self.grouping:
@@ -1698,8 +1675,6 @@ class Statement:
 				result = groupResult['group']
 			else:
 				result = extractions
-
-		pr('RETURNING EXTRACT')
 
 		return {'scope': startScope, 'line': lineNr, 'newLines': newLines, 'openType': 'statement', 'openName': self.name, 'result': result, 'beginId': beginId, 'endId': beginId+lastTargetEnd-1}
 
@@ -1719,8 +1694,6 @@ def determineOpen(text, scopeLevel, lineNr, id, currentId = 0):
 				return stat.extract(text, scopeLevel, lineNr, currentId)
 		else:
 			if hasWordNext(text, stat.begins):
-				if scopeLevel == 1: pr('Extracting ' + stat.name)
-				pr({'text': text, 'currentId': currentId})
 				return stat.extract(text, scopeLevel, lineNr, currentId)
 
 	# It wasn't a statement, so try getting the expression
@@ -1748,8 +1721,6 @@ def splitStatements(text, scopeLevel, lineNr = 1, curId = 0):
 
 	results = []
 
-	if scopeLevel == 1: pr('\n\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
-
 	# Go over every letter
 	while id < length:
 
@@ -1759,13 +1730,6 @@ def splitStatements(text, scopeLevel, lineNr = 1, curId = 0):
 		if not isWhitespace(cur):
 
 			result = determineOpen(text, scopeLevel, lineNr, id, id+curId)
-
-			if scopeLevel == 1:
-				pr(result)
-				if result['beginId'] == 24097:
-					pr('Error in text:')
-					pr(text)
-					die()
 
 			if result:
 
@@ -1789,8 +1753,6 @@ def splitStatements(text, scopeLevel, lineNr = 1, curId = 0):
 			lineNr += 1
 
 		id += 1
-
-	if scopeLevel == 1: pr('\n<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n\n')
 
 	returnResults = []
 	dbnow = False
