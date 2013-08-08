@@ -1079,9 +1079,13 @@ def tokenizeExpression(text):
 #  @param   text       The text to start from
 #  @param   hasBegun   If we already now this is an expression
 #  @param   waitingForOperand   If we're waiting for an operand
-def extractExpression(text, scopeLevel, lineNr, currentId, startId = 0, hasBegun = False, waitingForOperand = False):
+def extractExpression(originalText, scopeLevel, lineNr, currentId, startId = 0, hasBegun = False, waitingForOperand = False, sureNoStatement = False):
 
-	(text, exists) = shiftString(text, startId)
+	(text, exists) = shiftString(originalText, startId)
+
+
+	pr({'ext': text})
+
 
 	# The new lines we've encountered
 	newLines = 0
@@ -1151,12 +1155,17 @@ def extractExpression(text, scopeLevel, lineNr, currentId, startId = 0, hasBegun
 		# A statement word was found
 		if tempWord:
 
-			if hasBegun and tempWord == 'function':
+			if (sureNoStatement or hasBegun) and tempWord == 'function':
+
+				pr('Extracting FUNCTION EXPRESSION')
 
 				justFoundDb = False
 
 				# Extract the function
-				tempResult = function.extract(text, scopeLevel, lineNr+newLines, i)
+				tempResult = function.extract(originalText, scopeLevel, lineNr+newLines, 0, i+startId)
+
+				pr(tempResult['result'])
+				
 
 				extras.append(tempResult['result'])
 
@@ -1259,6 +1268,8 @@ def extractExpression(text, scopeLevel, lineNr, currentId, startId = 0, hasBegun
 		endId = i
 
 	endId += currentId + startId
+
+	pr({'EXPRESSIONDONE': originalText[currentId:endId]})
 
 	result = {'assignment': isAssignment, 'text': result.strip(), 'functions': extras, 'docblock': currentDocblock, 'scope': scopeLevel}
 
@@ -1503,6 +1514,8 @@ class Statement:
 
 				(targetName, targetRequired, extraOptions) = self.getNextTarget(position)
 
+				pr('Getting target ' + str(targetName))
+
 				# If we did find a target, we don't need to worry about the db
 				if targetName:
 					dbFoundNow = False
@@ -1683,6 +1696,7 @@ def determineOpen(text, scopeLevel, lineNr, id, currentId = 0):
 
 	# Do not strip the text here,
 	# It'll mess up the line numbers
+	original = text
 	text = text[id:]
 
 	# Is it a statement?
@@ -1697,8 +1711,8 @@ def determineOpen(text, scopeLevel, lineNr, id, currentId = 0):
 				return stat.extract(text, scopeLevel, lineNr, currentId)
 
 	# It wasn't a statement, so try getting the expression
-	return extractExpression(text, scopeLevel, lineNr, currentId, 0)
-	
+	return extractExpression(original, scopeLevel, lineNr, currentId, id, False, False, True)
+
 
 # Parsing starts here
 def splitStatements(text, scopeLevel, lineNr = 1, curId = 0):
@@ -1721,8 +1735,12 @@ def splitStatements(text, scopeLevel, lineNr = 1, curId = 0):
 
 	results = []
 
+	counter = 0
+
 	# Go over every letter
 	while id < length:
+
+		counter += 1
 
 		# Get the current char
 		cur = text[id]
@@ -1732,6 +1750,8 @@ def splitStatements(text, scopeLevel, lineNr = 1, curId = 0):
 			result = determineOpen(text, scopeLevel, lineNr, id, id+curId)
 
 			if result:
+
+				pr(result)
 
 				endId = result['endId']
 

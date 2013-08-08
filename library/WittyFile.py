@@ -136,7 +136,7 @@ class WittyFile:
 					if statement['openName'] == 'function':
 						pr('\n\n')
 						pr(statement)
-						pr({'begin': self.original[0:statement['endId']]})
+						pr({'begin': self.original[0:statement['beginId']]})
 						newScope = self.createNewScope(statement['line'], scopeId, docblock)
 						statement['subscopeId'] = newScope
 						for stat in r['block']['parsed']:

@@ -194,12 +194,12 @@ class WittyProject:
 				if temp.endswith('.') or temp.endswith('['):
 					endsWithMember = True
 
-				active = {}
+				active = {'properties': []}
 				
 				for token in normalized:
 
 					if not token['type']:
-						active = {}
+						active = {'properties': []}
 						continue
 
 					if 'member' in token and not token['member']:
