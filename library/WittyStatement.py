@@ -142,14 +142,29 @@ class WittyStatement:
 		return newVar
 
 	def processExpression(self):
+		
+		pr(self.statement)
+
+		# @todo: When there are functions in the expressions,
+		# they're not assigned to the variable if that is needed!
+
 		# If it's not an assignment, just ignore it
 		if not self.statement['result']['assignment']:
+
+			# If there are functions assigned ...
+			# @todo: This would still declare the function if it had a name,
+			# which function expressions don't do!
+			if self.statement['result']['functions']:
+				for fnc in self.statement['result']['functions']:
+					self.processFunction(fnc)
+
 			return
 
 		# Get the raw expression
 		expression = wf.normalizeExpression(self.statement['result']['text'])
 
 		targetVar = False
+		targetVars = []
 
 		for target in expression['target']:
 
@@ -173,6 +188,15 @@ class WittyStatement:
 			# If there is a docblock here, set that
 			if self.statement['docblock']:
 				prop['docblock'] = self.statement['docblock']
+
+			targetVars.append(prop)
+
+		# If there are functions assigned ...
+		if self.statement['result']['functions']:
+			for fnc in self.statement['result']['functions']:
+				self.processFunction(fnc, prop)
+
+		# @todo: We need to add assign this function to the other targets, too!!
 
 
 	# Process a var statement

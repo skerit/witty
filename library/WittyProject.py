@@ -381,6 +381,9 @@ class Intel:
 
 			pr('Processing ' + filename)
 
+			# Disable json file loads
+			#if not filename.endswith('.js'): continue
+
 			# Prepare all the scopes
 			# Here, we assume the file itself is also a scope
 			# That's kind-of true for node.js, but false for javascript
@@ -430,6 +433,16 @@ class Intel:
 				wf.log(scope, 'witty-WTScopes')
 
 			self.registerTypes()
+
+		# for name, file in self.files.items():
+		# 	wf.log('\n\nFILENAME: "' + name + '"', 'witty-final-variables')
+		# 	wf.log('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n'*3, 'witty-final-variables')
+			
+		for scope in self.scopes:
+			wf.log('\n\n>>\nScope: ' + str(scope.name), 'witty-final-variables')
+			wf.log((('>>>'*20) + '\n')*2, 'witty-final-variables')
+			wf.log(scope.variables, 'witty-final-variables', True)
+
 
 
 	## Register all the types

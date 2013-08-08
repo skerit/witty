@@ -109,6 +109,9 @@ class WittyFile:
 		statement['scopeId'] = scopeId
 		statement['line'] = self.original.count('\n', 0, statement['beginId']) + 1
 
+		pr(statement)
+		pr('Begins on line ' + str(statement['line']))
+
 		if 'openType' in statement and statement['openType'] == 'statement':
 
 			# @todo: Here, we just pass the statement docblock to the expressions
@@ -121,6 +124,8 @@ class WittyFile:
 
 			# Loop through all the results in this statement
 			for r in statement['result']:
+
+				pr(r)
 
 				# Add the docblock tot he first result, if it doesn't have one already
 				if resultCount == 0 and docblock and not r['docblock']:
@@ -152,16 +157,18 @@ class WittyFile:
 			# It's an expression
 
 			for f in statement['functions']:
+
+				lineNr = self.original.count('\n', 0, f['beginId']) + 1
+
 				# @todo: the statement docblock is currently the only docblock we store
 				# expressions can't have docblocks yet
-				self.parseStatement(f, self.createNewScope(statement['line'], scopeId, docblock))
+				self.parseStatement(f, self.createNewScope(lineNr, scopeId, docblock))
 		
 		# Recursively parse block contents
 		if 'block' in statement:
 			
 			for stat in statement['block']['parsed']:
 				self.parseStatement(stat, scopeId, docblock)
-
 		
 		return statement
 
