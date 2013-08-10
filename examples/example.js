@@ -113,7 +113,7 @@ var BaseClass = function BaseClass () {
  * @returns  {Function}   A new class
  */
 BaseClass.extend = function extend (_extension, _options, _three, _callback) {
-	
+
 	var origin    = this,        // The originating class
 	    options   = _options,
 	    callback  = _callback,

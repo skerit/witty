@@ -163,6 +163,7 @@ class WittyStatement:
 
 		targetVar = False
 		targetVars = []
+		prop = False
 
 		for target in expression['target']:
 
@@ -192,7 +193,8 @@ class WittyStatement:
 		# If there are functions assigned ...
 		if self.statement['result']['functions']:
 			for fnc in self.statement['result']['functions']:
-				self.processFunction(fnc, prop)
+				if prop:
+					self.processFunction(fnc, prop)
 
 		# @todo: We need to add assign this function to the other targets, too!!
 

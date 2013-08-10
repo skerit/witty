@@ -1518,10 +1518,10 @@ class Statement:
 
 
 					if position == 0:
-						extractions['beginId'] = nextNl + currentId
+						extractions['beginId'] = nextNL + currentId
 
 						if groupCount == 0:
-							beginId = nextNl + currentId
+							beginId = nextNL + currentId
 
 					continue
 
