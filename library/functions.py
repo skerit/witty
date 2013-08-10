@@ -111,6 +111,7 @@ def dictify(data, level=0):
 #  @param   filename    The filename inside /dev/shm/
 #  @param   doDictify   Dictify the given data
 def log(data, filename='workfile', doDictify=False):
+	return
 
 	global openFiles
 
@@ -1132,7 +1133,6 @@ def extractExpression(text, scopeLevel, lineNr, currentId = 0, startId = 0, hasB
 		try:
 			c = text[id]
 		except IndexError:
-			pr('id ' + str(id) + ' > ' + str(maxId))
 			die()
 
 		if isWhitespace(c):
@@ -1179,15 +1179,10 @@ def extractExpression(text, scopeLevel, lineNr, currentId = 0, startId = 0, hasB
 
 			if (sureNoStatement or hasBegun) and tempWord == 'function':
 
-				pr('Extracting FUNCTION EXPRESSION')
-
 				justFoundDb = False
 
 				# Extract the function
 				tempResult = function.extract(text, scopeLevel, lineNr+newLines, currentId, id)
-
-				pr(tempResult['result'])
-				
 
 				extras.append(tempResult['result'])
 
@@ -1521,12 +1516,8 @@ class Statement:
 					nextNL = getNextCharId(text, '\n', inlineComment)
 					id = nextNL
 
-					pr('Found inlinecomment!')
-					pr('Position is ' + str(position))
-					pr('nextId is ' + id)
 
 					if position == 0:
-						pr('Comment before first position!!!!')
 						extractions['beginId'] = nextNl + currentId
 
 						if groupCount == 0:
@@ -1554,8 +1545,6 @@ class Statement:
 					continue
 
 				(targetName, targetRequired, extraOptions) = self.getNextTarget(position)
-
-				pr('Getting target ' + str(targetName))
 
 				# If we did find a target, we don't need to worry about the db
 				if targetName:
@@ -1652,6 +1641,8 @@ class Statement:
 
 					tempBeginId += id
 
+					
+
 					# Now parse these results, too!
 					#parsedResults = splitStatements(result, scopeLevel, lineNr, tempBeginId)
 					parsedResults = splitStatements(text[:endId], scopeLevel, lineNr, tempBeginId+1, currentId)
@@ -1665,7 +1656,7 @@ class Statement:
 					}
 
 					# Set the next Id
-					id = id+endId+1
+					id = endId+1
 					lastTargetEnd = id
 
 					# Increase the newlines
@@ -1726,19 +1717,24 @@ def determineOpen(originalText, scopeLevel, lineNr, id = 0, currentId = 0):
 
 	rest = originalText[id:]
 
+	result = False
+
 	# Is it a statement?
 	for name, stat in statements.items():
 
 		# Strict means we don't care what comes after the opening tag
 		if stat.greedy:
 			if rest.startswith(stat.begins):
-				return stat.extract(originalText, scopeLevel, lineNr, currentId, id)
+				result = stat.extract(originalText, scopeLevel, lineNr, currentId, id)
 		else:
 			if hasWordNext(rest, stat.begins):
-				return stat.extract(originalText, scopeLevel, lineNr, currentId, id)
+				result = stat.extract(originalText, scopeLevel, lineNr, currentId, id)
 
 	# It wasn't a statement, so try getting the expression
-	return extractExpression(originalText, scopeLevel, lineNr, currentId, id, False, False, True)
+	if not result:
+		result = extractExpression(originalText, scopeLevel, lineNr, currentId, id, False, False, True)
+
+	return result
 
 
 ## Parsing starts here

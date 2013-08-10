@@ -109,9 +109,6 @@ class WittyFile:
 		statement['scopeId'] = scopeId
 		statement['line'] = self.original.count('\n', 0, statement['beginId']) + 1
 
-		pr(statement)
-		pr('Begins on line ' + str(statement['line']))
-
 		if 'openType' in statement and statement['openType'] == 'statement':
 
 			# @todo: Here, we just pass the statement docblock to the expressions
@@ -125,8 +122,6 @@ class WittyFile:
 			# Loop through all the results in this statement
 			for r in statement['result']:
 
-				pr(r)
-
 				# Add the docblock tot he first result, if it doesn't have one already
 				if resultCount == 0 and docblock and not r['docblock']:
 					r['docblock'] = docblock
@@ -139,9 +134,7 @@ class WittyFile:
 				if 'block' in r:
 
 					if statement['openName'] == 'function':
-						pr('\n\n')
-						pr(statement)
-						pr({'begin': self.original[0:statement['beginId']]})
+						# @todo: some blocks are created even when they're not a function!
 						newScope = self.createNewScope(statement['line'], scopeId, docblock)
 						statement['subscopeId'] = newScope
 						for stat in r['block']['parsed']:

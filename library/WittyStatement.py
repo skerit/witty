@@ -143,8 +143,6 @@ class WittyStatement:
 
 	def processExpression(self):
 		
-		pr(self.statement)
-
 		# @todo: When there are functions in the expressions,
 		# they're not assigned to the variable if that is needed!
 
