@@ -1,0 +1,26 @@
+{
+	"setTimeout": {
+		"description": "Run callback cb after at least ms milliseconds. The actual delay depends on external factors like OS timer granularity and system load.",
+		"name": "setTimeout",
+		"type": "Function",
+		"properties": {}
+	},
+	"clearTimeout": {
+		"description": "Stop a timer that was previously created with setTimeout(). The callback will not execute.",
+		"name": "clearTimeout",
+		"type": "Function",
+		"properties": {}
+	},
+	"setInterval": {
+		"description": "Run callback cb repeatedly every ms milliseconds. Note that the actual interval may vary, depending on external factors like OS timer granularity and system load. It's never less than ms but it may be longer.",
+		"name": "setInterval",
+		"type": "Function",
+		"properties": {}
+	},
+	"clearInterval": {
+		"description": "Stop a timer that was previously created with setInterval(). The callback will not execute.",
+		"name": "clearInterval",
+		"type": "Function",
+		"properties": {}
+	}
+}
