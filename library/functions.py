@@ -421,7 +421,7 @@ def getNextCharId(text, word, id = False):
 		if stack == word:
 			return id+i
 
-	return False
+	return -1
 
 # See if there's an operator somewhere after
 def hasOperatorAfter(text, id = False):
@@ -793,7 +793,12 @@ def extractBetween(text, open, close):
 		# Skip inline comments
 		if c == '/' and text[i+1] == '/':
 			nextNL = getNextCharId(text[i:], '\n')
-			skipToId = nextNL+i
+
+			if nextNL > -1:
+				skipToId = nextNL+i
+			else:
+				skipToId = len(text)-1
+
 		elif c == '/' and text[i+1] == '*':
 			(tempResult, tempEndId, tempNL) = extractGreedy(text[i:], '/*', '*/')
 
@@ -1533,7 +1538,13 @@ class Statement:
 				inlineComment = hasCharsAfter(text, '//', id, True, True)
 				if inlineComment > -1:
 					nextNL = getNextCharId(text, '\n', inlineComment)
-					id = nextNL
+
+					# If we found a newline, skip to it
+					if nextNL > -1:
+						id = nextNL
+					else:
+						# If we did not find a newline, skip to the end
+						id = len(text) - 1
 
 
 					if position == 0:
@@ -1780,8 +1791,14 @@ def splitStatements(text, scopeLevel, lineNr = 1, id = 0, currentId = 0):
 	# The list of resulting statements
 	results = []
 
+	count = 0
+
 	# Go over every letter
 	while id <= maxId:
+
+		count += 1
+
+		if count == 50: die()
 
 		# Get the current char
 		currentChar = text[id]
@@ -1796,6 +1813,8 @@ def splitStatements(text, scopeLevel, lineNr = 1, id = 0, currentId = 0):
 				if skip > -1:
 					id = skip+1
 					continue
+				else:
+					break
 
 			result = determineOpen(text, scopeLevel, lineNr, id, currentId)
 
