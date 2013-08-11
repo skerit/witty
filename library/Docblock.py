@@ -45,12 +45,12 @@ class Docblock:
 		properties = {}
 
 		for match_tupple in match:
-			property_name = match_tupple[0].lower()
+			property_name = match_tupple[0].lower().strip()
 
 			if not (property_name in properties):
 				properties[property_name] = []
 
-			properties[property_name].append(match_tupple[1])
+			properties[property_name].append(match_tupple[1].strip())
 
 		return properties
 
@@ -68,6 +68,7 @@ class Docblock:
 		if result:
 			result = re.sub('{', '', result)
 			result = re.sub('}', '', result)
+			result = result.strip()
 			
 		return result
 

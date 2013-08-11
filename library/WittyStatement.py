@@ -94,8 +94,17 @@ class WittyStatement:
 			self.processVar()
 		elif self.typeName == 'function':
 			self.processFunction()
+		elif self.type == 'statement':
+			self.processStatement()
 		elif self.typeName == 'expression':
 			self.processExpression()
+		elif self.type == 'scope':
+			pass
+		else:
+			pr(self.type)
+			pr(self.statement)
+			die()
+
 
 	def createEmpty(self, name, type):
 		return {
@@ -141,6 +150,17 @@ class WittyStatement:
 
 		return newVar
 
+	def processStatement(self):
+
+		result = self.statement['result'][0]
+
+		# Recursively go through all the statements in this file
+		if 'block' in result:
+			for stat in result['block']['parsed']:
+				WittyStatement(self.parentfile, stat)
+
+		
+
 	def processExpression(self):
 		
 		# @todo: When there are functions in the expressions,
@@ -168,8 +188,7 @@ class WittyStatement:
 		for target in expression['target']:
 
 			if not 'name' in target:
-				pr('Missing name in target:')
-				pr(target)
+				pr({'target_without_name': target})
 				continue
 
 			targetVar = self.touchVar(target['name'])

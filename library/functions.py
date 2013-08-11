@@ -777,11 +777,29 @@ def extractBetween(text, open, close):
 	# Where we started extracting
 	beginId = 0
 
+	skipToId = False
+
+	totalCount = 0
+
 	for i, c in enumerate(text):
 
 		# Count newlines
 		if c == '\n':
 			newLines += 1
+
+		if skipToId > i:
+			continue
+
+		# Skip inline comments
+		if c == '/' and text[i+1] == '/':
+			nextNL = getNextCharId(text[i:], '\n')
+			skipToId = nextNL+i
+		elif c == '/' and text[i+1] == '*':
+			(tempResult, tempEndId, tempNL) = extractGreedy(text[i:], '/*', '*/')
+
+			if tempEndId:
+				skipToId = tempEndId + i
+				continue
 
 		# If c is a escape, invert the escape status
 		if c == "\\":
@@ -789,9 +807,6 @@ def extractBetween(text, open, close):
 
 		# If a string is open
 		if stringOpen:
-
-			# Add the current char no matter what
-			result = result + c
 
 			# And the new char is the same literal,
 			# and it wasn't escaped
@@ -807,7 +822,7 @@ def extractBetween(text, open, close):
 				beginId = i
 				isOpen = True
 				betweenOpen = 1
-				#result += c # Do not add the opener!
+				totalCount = 1
 			else:
 				# This is not a space and not an opener, so stop!
 				break
@@ -820,8 +835,10 @@ def extractBetween(text, open, close):
 			elif c == '"':
 				stringOpen = '"'
 			else:
+
 				if c == open:
 					betweenOpen += 1
+					totalCount += 1
 				elif c == close:
 					betweenOpen -= 1
 
@@ -829,11 +846,10 @@ def extractBetween(text, open, close):
 					if betweenOpen == 0:
 						break
 
-			result = result + c
-
 	endId = i
+	beginId = beginId + 1
 
-	return result, beginId, endId, newLines
+	return text[beginId:endId], beginId, endId, newLines
 
 # Extract a greedy statement, one that does not care
 # what comes between begin and end char, like /* */
@@ -902,6 +918,9 @@ def extractGreedy(text, begins, ends, skipBeginSpaces = False):
 			result += c
 	
 	endId = i
+
+	# Only include the content in between
+	result = result[len(begins):len(result)-len(ends)].strip()
 
 	return result, endId, newLines
 
@@ -1622,18 +1641,24 @@ class Statement:
 
 					(result, tempBeginId, endId, tempLines) = extractCurly(text[id:])
 
+					parsedResults = False
+
 					# If the result is empty, make sure it was because
 					# the block was empty
 					if not result:
-						
 						# If there is no block, get the first expression
 						if not hasCharsAfter(text[id:], '{'):
-							
-							tempResult = extractExpression(text[:endId], scopeLevel, lineNr, currentId, id, True, True)
+
+							tempResult = determineOpen(text, scopeLevel, lineNr, id, currentId, True)
+
 							tempBeginId = tempResult['beginId']
-							result = tempResult['result']['text']
 							endId = tempResult['endId']+currentId
 							tempLines = tempResult['newLines']
+
+							if tempResult['openType'] == 'statement':
+								parsedResults = [tempResult]
+							else:
+								result = tempResult['result']['text']
 
 						pass
 					else:
@@ -1641,11 +1666,9 @@ class Statement:
 
 					tempBeginId += id
 
-					
-
 					# Now parse these results, too!
-					#parsedResults = splitStatements(result, scopeLevel, lineNr, tempBeginId)
-					parsedResults = splitStatements(text[:endId], scopeLevel, lineNr, tempBeginId+1, currentId)
+					if not parsedResults:
+						parsedResults = splitStatements(text[:endId], scopeLevel, lineNr, tempBeginId+1, currentId)
 
 					# Store the result in the extractions
 					extractions['block'] = {
@@ -1713,7 +1736,10 @@ class Statement:
 		return {'scope': startScope, 'line': lineNr, 'newLines': newLines, 'openType': 'statement', 'openName': self.name, 'result': result, 'beginId': beginId, 'endId': lastTargetEnd+currentId-1}
 
 # Get the next statement/expression
-def determineOpen(originalText, scopeLevel, lineNr, id = 0, currentId = 0):
+def determineOpen(originalText, scopeLevel, lineNr, id = 0, currentId = 0, skipBeginSpaces = False):
+
+	if skipBeginSpaces and originalText[id] in whitespace:
+		return determineOpen(originalText, scopeLevel, lineNr, id+1, currentId, True)
 
 	rest = originalText[id:]
 
@@ -1761,6 +1787,15 @@ def splitStatements(text, scopeLevel, lineNr = 1, id = 0, currentId = 0):
 		currentChar = text[id]
 
 		if not isWhitespace(currentChar):
+
+			# If this is an inline comment, skip it
+			if hasCharsAfter(text, '//', id):
+			
+				skip = getNextCharId(text, '\n', id)
+
+				if skip > -1:
+					id = skip+1
+					continue
 
 			result = determineOpen(text, scopeLevel, lineNr, id, currentId)
 

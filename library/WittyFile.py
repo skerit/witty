@@ -112,7 +112,11 @@ class WittyFile:
 		if 'openType' in statement and statement['openType'] == 'statement':
 
 			# @todo: Here, we just pass the statement docblock to the expressions
-			docblock = statement['docblock']
+			try:
+				docblock = statement['docblock']
+			except KeyError:
+				statement['docblock'] = ''
+				docblock = False
 
 			resultCount = 0
 
