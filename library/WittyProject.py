@@ -195,6 +195,8 @@ class WittyProject:
 					endsWithMember = True
 
 				active = {'properties': []}
+
+				pr(normalized)
 				
 				for token in normalized:
 
@@ -211,6 +213,8 @@ class WittyProject:
 
 				if 'properties' in active and not endsWithMember and len(active['properties']):
 					del active['properties'][len(active['properties'])-1]
+
+				pr(active)
 
 				if 'name' in active:
 					foundVar = scope.findVariable(active['name'])

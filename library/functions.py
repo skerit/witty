@@ -1076,13 +1076,13 @@ def tokenizeExpression(text):
 
 				skipToId = i+tempId+1
 			elif c == '{':
-				(tempResult, tempBeginId, tempEndId, tempNewLines) = extractCurly(text[i:])
+				#(tempResult, tempBeginId, tempEndId, tempNewLines) = extractCurly(text[i:])
 
-				token['type'] = 'curly'
-				token['text'] = '{' + tempResult + '}'
-				
-				skipToId = i+tempEndId+1
-				
+				token['type'] = 'opencurly'
+				token['text'] = '{'
+			elif c == '}':
+				token['type'] = 'closecurly'
+				token['text'] = '{'
 			elif c == '[':
 				(tempResult, tempBeginId, tempEndId, tempNewLines) = extractSquare(text[i:])
 
