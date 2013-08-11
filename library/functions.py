@@ -1791,14 +1791,8 @@ def splitStatements(text, scopeLevel, lineNr = 1, id = 0, currentId = 0):
 	# The list of resulting statements
 	results = []
 
-	count = 0
-
 	# Go over every letter
 	while id <= maxId:
-
-		count += 1
-
-		if count == 50: die()
 
 		# Get the current char
 		currentChar = text[id]
