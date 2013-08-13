@@ -183,8 +183,7 @@ class WittyProject:
 					getScopeVars = False
 
 			if normalized:
-				normalized = wf.tokenizeExpression(expr)
-
+				
 				temp = expr.replace(' ', '')
 				temp = temp.replace('\n', '')
 				temp = temp.replace('\t', '')

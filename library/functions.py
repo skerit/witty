@@ -1067,6 +1067,11 @@ def tokenizeExpression(text):
 		elif c == '=':
 			token['type'] = 'assignment'
 			token['text'] = '='
+		elif c == '/' and text[i+1] == '*':
+			(tresult, tendId, tnewLines) = extractGreedy(text[i:], '/*', '*/')
+			token['type'] = 'docblock'
+			token['text'] = tresult
+			skipToId = i + tendId
 		elif c in literals:
 			if c == "'" or c == '"':
 				(tempResult, tempId, tempNewLines) = extractString(text, c, i)
