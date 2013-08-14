@@ -145,6 +145,26 @@ class Docblock:
 		else:
 			return self.parseAttribute(self.properties[name])
 
+	# Get the return value
+	def getReturn(self):
+
+		if not 'return' in self.properties:
+			return None
+		else:
+			ret = self.getAttribute('return')
+			if ret:
+				ret = ret.strip()
+				pieces = ret.split(' ', 1)
+				type = re.sub('{', '', pieces[0])
+				type = re.sub('}', '', type)
+				type = type.strip()
+
+				description = pieces[1]
+
+				return {'type': type, 'description': description}
+			else:
+				return None
+
 	# See if this property is present
 	def hasAttribute(self, name):
 		

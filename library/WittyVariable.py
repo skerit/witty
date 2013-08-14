@@ -123,6 +123,12 @@ class WittyVariable:
 		
 		return variables
 
+	def getReturn(self):
+		if self.docblock:
+			return self.docblock.getReturn()
+		else:
+			return None
+
 	def setBase(self, variable):
 
 		# Store info
@@ -158,11 +164,22 @@ class WittyVariable:
 				# See if there is a value assignment
 				value = valueResult['text']
 
+				# Remove trailing semicolon
+				if value[-1:] == ';':
+					value = value[:-1]
+
+				if value == '}':
+					pr(valueResult)
+
 				if not len(value):
 					pass # Do nothing if there is no text
+				elif value[:4] == 'new ':
+					# Constructor form is used!
+					className = value[4:].split('(')[0].strip()
+					self.type = className
 				elif value[0] == '"' or value[0] == "'":
 					self.type = 'String'
-				elif value in ['true', 'false']:
+				elif value in ['true', 'false', 'true;', 'false;']:
 					self.type = 'Boolean'
 				elif value[0] == '{':
 					self.type = 'Object'
@@ -170,6 +187,19 @@ class WittyVariable:
 					self.type = 'Array'
 				elif value.isdigit():
 					self.type = 'Number'
+				elif '(' in value:
+					# It might be a function call
+					functionName = value.split('(')[0].strip()
+
+					existing = self.scope.findVariable(functionName)
+
+					if existing:
+						# Get the type this function returns!
+						returnInfo = existing.getReturn()
+
+						if returnInfo:
+							self.setType(returnInfo['type'])
+
 				elif self.scope:
 
 					# See if it's an existing variable somewhere
