@@ -105,7 +105,7 @@ class WittyStatement:
 			pr(self.statement)
 			die()
 
-
+	## Create an empty variable dict
 	def createEmpty(self, name, type):
 		return {
 			'name': name,
@@ -115,6 +115,7 @@ class WittyStatement:
 			'value': None,
 			'description': None,
 			'reference': False,
+			'options': {},
 			'properties': {}
 		}
 
@@ -188,7 +189,6 @@ class WittyStatement:
 		for target in expression['target']:
 
 			if not 'name' in target:
-				pr({'target_without_name': target})
 				continue
 
 			targetVar = self.touchVar(target['name'])

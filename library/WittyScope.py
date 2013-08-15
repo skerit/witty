@@ -229,6 +229,7 @@ class WittyScope:
 		# in upper scopes. If it's not, we'll
 		# add it to the global or module scope
 		if not declared:
+
 			existingVar = self.findVariable(variable['name'])
 
 			# If it's an existing var, add an appearance
@@ -242,16 +243,14 @@ class WittyScope:
 				# Create a new empty variable (with the id set)
 				newVar = self.intel.createEmptyVariable()
 
-				# @todo: In node.js you can't set something to the global by just omitting var
-				# So we'll have to find something for that
-				# Set the scope to the root scope (global)
-				#useScope = self.getRoot()
-
-				# Get the filescope
-				useScope = self.getFileScope()
+				# In node.js undeclared variables are restricted to the module
+				if self.intel.language == 'nodejs':
+					useScope = self.getFileScope()
+				elif self.intel.language == 'browser':
+					useScope = self.getRoot()
 
 				# If it has not been found, raise an error
-				if not useScope: raise Exception('FileScope not found')
+				if not useScope: raise Exception('Scope not found')
 		else:
 			existingVar = self.findVariable(variable['name'], True)
 
@@ -264,6 +263,12 @@ class WittyScope:
 		newVar.setScope(useScope)
 
 		newVar.setBase(variable)
+
+		# Set the options
+		if 'options' in variable:
+			newVar.options = variable['options']
+		else:
+			newVar.options = {}
 
 		# Set the statement
 		newVar.setStatement(statement)

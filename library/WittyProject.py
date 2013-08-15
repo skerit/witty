@@ -528,11 +528,6 @@ class Intel:
 
 			pr('Processing ' + filename)
 
-			# Disable json file loads
-			#if not filename.endswith('.js'): continue
-
-			pr(wittyFile)
-
 			# Prepare all the scopes
 			# Here, we assume the file itself is also a scope
 			# That's kind-of true for node.js, but false for javascript

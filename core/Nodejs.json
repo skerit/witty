@@ -6,6 +6,9 @@
 			"description": "The global object in node.js",
 			"name": "global",
 			"type": "Object",
+			"options": {
+				"globalizer": true
+			},
 			"properties": {}
 		},
 		"process": {

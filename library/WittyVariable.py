@@ -11,6 +11,9 @@ class WittyVariable:
 	# Every variable has a unique id
 	id = None
 
+	# Extra options
+	options = None
+
 	# What is the scope of this variable?
 	# This does NOT equal to where it was declared
 	# As global variables can be declared elsewhere
@@ -40,6 +43,7 @@ class WittyVariable:
 		self.statements = []
 		self.propArray = []
 		self.properties = {}
+		self.options = {}
 
 	def setDocblock(self, text):
 		
@@ -168,9 +172,6 @@ class WittyVariable:
 				if value[-1:] == ';':
 					value = value[:-1]
 
-				if value == '}':
-					pr(valueResult)
-
 				if not len(value):
 					pass # Do nothing if there is no text
 				elif value[:4] == 'new ':
@@ -211,11 +212,12 @@ class WittyVariable:
 	## Make a reference to the given variable
 	#  @param   self        The object pointer
 	#  @param   existing    The given variable
-	def makeReference(self, existing):
+	def makeReference(self, existing, forceAll = False):
 
-		if existing.type in ['Function', 'Object', 'Array']:
+		if forceAll or existing.type in ['Function', 'Object', 'Array']:
 			self.properties = existing.properties
 			self.propArray = existing.propArray
+			self.options = existing.options
 
 		self.setType(existing.type)
 
@@ -305,3 +307,17 @@ class WittyVariable:
 		if 'properties' in info:
 			# Recursively add deeper properties
 			prop.touchProperties(info['properties'], statement)
+
+		# If the property is added to a globalizer, it becomes a global!
+		if 'globalizer' in self.options and self.options['globalizer']:
+
+			rootScope = self.scope.getRoot()
+
+			newGlob = rootScope.intel.createEmptyVariable()
+			newGlob.setScope(rootScope)
+			newGlob.setStatement(statement)
+			newGlob.setName(name)
+
+			newGlob.makeReference(prop, True)
+
+			rootScope.registerVariable(newGlob)

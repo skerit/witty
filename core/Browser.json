@@ -1,0 +1,15 @@
+{
+	"languages": ["browser"],
+	"scope": 0,
+	"variables": {
+		"window": {
+			"description": "The global object in the browser",
+			"name": "window",
+			"type": "Object",
+			"options": {
+				"globalizer": true
+			},
+			"properties": {}
+		}
+	}
+}
