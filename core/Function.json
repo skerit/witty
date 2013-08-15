@@ -1,52 +1,56 @@
 {
-	"Function": {
-		"description": null,
-		"name": "Function",
-		"type": "Function,Object",
-		"properties": {
-			"prototype": {
-				"name": "prototype",
-				"type": "Function",
-				"properties": {
-					"caller": {
-						"description": "Specifies the function that invoked the currently executing function.",
-						"name": "caller",
-						"type": "Function"
-					},
-					"constructor": {
-						"description": "Specifies the function that creates an object's prototype.",
-						"name": "constructor",
-						"type": "Function"
-					},
-					"length": {
-						"description": "Specifies the number of arguments expected by the function.",
-						"name": "length",
-						"type": "Number"
-					},
-					"name": {
-						"description": "The name of the function.",
-						"name": "name",
-						"type": "String"
-					},
-					"apply": {
-						"description": "Applies the method of another object in the context of a different object (the calling object); arguments can be passed as an Array object.",
-						"name": "apply",
-						"type": "Function"
-					},
-					"bind": {
-						"description": "Creates a new function which, when called, itself calls this function in the context of the provided value, with a given sequence of arguments preceding any provided when the new function was called.",
-						"name": "bind",
-						"type": "Function"
-					},
-					"call": {
-						"description": "Calls (executes) a method of another object in the context of a different object (the calling object); arguments can be passed as they are.",
-						"name": "call",
-						"type": "Function"
-					},
-					"toString": {
-						"description": "Returns a string representing the source code of the function. Overrides the Object.toString method.",
-						"name": "toString",
-						"type": "Function"
+	"languages": ["nodejs", "browser"],
+	"scope": 0,
+	"variables": {
+		"Function": {
+			"description": null,
+			"name": "Function",
+			"type": "Function,Object",
+			"properties": {
+				"prototype": {
+					"name": "prototype",
+					"type": "Function",
+					"properties": {
+						"caller": {
+							"description": "Specifies the function that invoked the currently executing function.",
+							"name": "caller",
+							"type": "Function"
+						},
+						"constructor": {
+							"description": "Specifies the function that creates an object's prototype.",
+							"name": "constructor",
+							"type": "Function"
+						},
+						"length": {
+							"description": "Specifies the number of arguments expected by the function.",
+							"name": "length",
+							"type": "Number"
+						},
+						"name": {
+							"description": "The name of the function.",
+							"name": "name",
+							"type": "String"
+						},
+						"apply": {
+							"description": "Applies the method of another object in the context of a different object (the calling object); arguments can be passed as an Array object.",
+							"name": "apply",
+							"type": "Function"
+						},
+						"bind": {
+							"description": "Creates a new function which, when called, itself calls this function in the context of the provided value, with a given sequence of arguments preceding any provided when the new function was called.",
+							"name": "bind",
+							"type": "Function"
+						},
+						"call": {
+							"description": "Calls (executes) a method of another object in the context of a different object (the calling object); arguments can be passed as they are.",
+							"name": "call",
+							"type": "Function"
+						},
+						"toString": {
+							"description": "Returns a string representing the source code of the function. Overrides the Object.toString method.",
+							"name": "toString",
+							"type": "Function"
+						}
 					}
 				}
 			}

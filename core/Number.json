@@ -1,82 +1,86 @@
 {
-	"Number": {
-		"description": null,
-		"name": "Number",
-		"type": "Function",
-		"properties": {
-			"MAX_VALUE": {
-				"description": "The largest positive representable number.",
-				"name": "MAX_VALUE",
-				"type": "Number"
-			},
-			"MIN_VALUE": {
-				"description": "The smallest positive representable number - that is, the positive number closest to zero (without actually being zero).",
-				"name": "MAX_VALUE",
-				"type": "Number"
-			},
-			"NaN": {
-				"description": "Special \"not a number\" value.",
-				"name": "NaN",
-				"type": "Number"
-			},
-			"NEGATIVE_INFINITY": {
-				"description": "Special value representing negative infinity; returned on overflow.",
-				"name": "NEGATIVE_INFINITY",
-				"type": "Number"
-			},
-			"POSITIVE_INFINITY": {
-				"description": "Special value representing infinity; returned on overflow.",
-				"name": "POSITIVE_INFINITY",
-				"type": "Number"
-			},
-			"isNaN": {
-				"description": "Determine whether the passed value is NaN.",
-				"name": "isNaN",
-				"type": "Function"
-			},
-			"isFinite": {
-				"description": "Determine whether the type of and the passed value itself is a finite number.",
-				"name": "isFinite",
-				"type": "Function"
-			},
-			"isInteger": {
-				"description": "Determine whether the type of the passed value is \"number\" and the passed value is an integer.",
-				"name": "isInteger",
-				"type": "Function"
-			},
-			"prototype": {
-				"name": "prototype",
-				"type": "Function",
-				"properties": {
-					"toExponential": {
-						"description": "Returns a string representing the number in exponential notation.",
-						"name": "toExponential",
-						"type": "Function"
-					},
-					"toFixed": {
-						"description": "Returns a string representing the number in fixed-point notation.",
-						"name": "toFixed",
-						"type": "Function"
-					},
-					"toLocaleString": {
-						"description": "Returns a string with a language sensitive representation of this number. Overrides the Object.prototype.toLocaleString method.",
-						"name": "toLocaleString",
-						"type": "Function"
-					},
-					"toPrecision": {
-						"description": "Returns a string representing the number to a specified precision in fixed-point or exponential notation.",
-						"name": "toPrecision",
-						"type": "Function"
-					},
-					"valueOf": {
-						"description": "Returns the primitive value of the specified object. Overrides the Object.prototype.valueOf method.",
-						"name": "valueOf",
-						"type": "Function"
-					},
-					"toString": {
-						"description": "Returns a string representing the source code of the function. Overrides the Object.toString method.",
-						"name": "toString",
-						"type": "Function"
+	"languages": ["nodejs", "browser"],
+	"scope": 0,
+	"variables": {
+		"Number": {
+			"description": null,
+			"name": "Number",
+			"type": "Function",
+			"properties": {
+				"MAX_VALUE": {
+					"description": "The largest positive representable number.",
+					"name": "MAX_VALUE",
+					"type": "Number"
+				},
+				"MIN_VALUE": {
+					"description": "The smallest positive representable number - that is, the positive number closest to zero (without actually being zero).",
+					"name": "MAX_VALUE",
+					"type": "Number"
+				},
+				"NaN": {
+					"description": "Special \"not a number\" value.",
+					"name": "NaN",
+					"type": "Number"
+				},
+				"NEGATIVE_INFINITY": {
+					"description": "Special value representing negative infinity; returned on overflow.",
+					"name": "NEGATIVE_INFINITY",
+					"type": "Number"
+				},
+				"POSITIVE_INFINITY": {
+					"description": "Special value representing infinity; returned on overflow.",
+					"name": "POSITIVE_INFINITY",
+					"type": "Number"
+				},
+				"isNaN": {
+					"description": "Determine whether the passed value is NaN.",
+					"name": "isNaN",
+					"type": "Function"
+				},
+				"isFinite": {
+					"description": "Determine whether the type of and the passed value itself is a finite number.",
+					"name": "isFinite",
+					"type": "Function"
+				},
+				"isInteger": {
+					"description": "Determine whether the type of the passed value is \"number\" and the passed value is an integer.",
+					"name": "isInteger",
+					"type": "Function"
+				},
+				"prototype": {
+					"name": "prototype",
+					"type": "Function",
+					"properties": {
+						"toExponential": {
+							"description": "Returns a string representing the number in exponential notation.",
+							"name": "toExponential",
+							"type": "Function"
+						},
+						"toFixed": {
+							"description": "Returns a string representing the number in fixed-point notation.",
+							"name": "toFixed",
+							"type": "Function"
+						},
+						"toLocaleString": {
+							"description": "Returns a string with a language sensitive representation of this number. Overrides the Object.prototype.toLocaleString method.",
+							"name": "toLocaleString",
+							"type": "Function"
+						},
+						"toPrecision": {
+							"description": "Returns a string representing the number to a specified precision in fixed-point or exponential notation.",
+							"name": "toPrecision",
+							"type": "Function"
+						},
+						"valueOf": {
+							"description": "Returns the primitive value of the specified object. Overrides the Object.prototype.valueOf method.",
+							"name": "valueOf",
+							"type": "Function"
+						},
+						"toString": {
+							"description": "Returns a string representing the source code of the function. Overrides the Object.toString method.",
+							"name": "toString",
+							"type": "Function"
+						}
 					}
 				}
 			}

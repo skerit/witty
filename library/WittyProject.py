@@ -53,7 +53,8 @@ class WittyProject:
 		self.pickleFileName = '/dev/shm/wittypickle-' + self.id
 
 		# The Single Point Of Contact to get data
-		self.intel = None
+		self.intelNode = None
+		self.intelBrowser = None
 
 		# Init the intel
 		self._initIntel()
@@ -64,7 +65,6 @@ class WittyProject:
 		fileInfo = self.getFileInfo(filepath)
 
 		if fileInfo:
-			pr(fileInfo)
 			baseFolder = fileInfo['base']
 			fileName = fileInfo['file']
 		else:
@@ -136,8 +136,6 @@ class WittyProject:
 
 		syntax = view.settings().get('syntax').split('/')[-1]
 
-		pr(view.settings().get('syntax'))
-
 		# Packages/JavaScript/JavaScript.tmLanguage
 		if syntax == 'JavaScript.tmLanguage':
 			syntax = 'browser'
@@ -169,21 +167,31 @@ class WittyProject:
 	# Is data already available for this file?
 	def hasFileData(self, fileName):
 
-		# If data is empty, return false
-		if not self.intel:
+		language = self.getFileLanguage(fileName)
+
+		if language == 'nodejs':
+			thisIntel = self.intelNode
+		elif language == 'browser':
+			thisIntel = self.intelBrowser
+		else:
 			return False
 
-		if fileName in self.intel.files:
+		# If data is empty, return false
+		if not thisIntel:
+			return False
+
+		if fileName in thisIntel.files:
 			return True
 
 		return False
 
 	# Store all the data on disk
 	def storeOnDisk(self):
-		if self.pickleFileName and self.intel and len(self.intel.files):
+
+		if self.pickleFileName and ((self.intelNode and len(self.intelNode.files)) or (self.intelBrowser and len(self.intelBrowser.files))):
 			# Pickle data
 			pickleFile = open(self.pickleFileName, 'wb')
-			pickle.dump(self.intel, pickleFile)
+			pickle.dump({'nodejs': self.intelNode, 'browser': self.intelBrowser}, pickleFile)
 			pickleFile.close()
 
 	# Query for completions
@@ -405,20 +413,28 @@ class WittyProject:
 		jar = self._unpickle()
 
 		# If the jar is not empty, return the data
-		if jar and len(jar.files):
-			self.intel = jar
+		if jar:
+			self.intelNode = jar['nodejs']
+			self.intelBrowser = jar['browser']
 		else:
 
 			# Create a new intel object
-			self.intel = Intel(self)
+			self.intelNode = Intel(self, 'nodejs')
+			self.intelBrowser = Intel(self, 'browser')
 
-			# Load in the json files!
-			CORE = WittyFile(self, 'CORE', True)
-			CORE.loadFiles(os.path.join(sublime.packages_path(), "Witty", "core"))
+			# Load in the json files for node.js
+			CORENODE = WittyFile(self, 'CORENODE', True)
+			CORENODE.loadFiles(os.path.join(sublime.packages_path(), "Witty", "core"), 'nodejs')
 
-			self.intel.files['CORE_FILE_WITTY'] = CORE
+			self.intelNode.files['CORENODE_FILE_WITTY'] = CORENODE
 
-			# The jar is empty, so start the parser, but return an empty dict
+			# Load in the json files for node.js
+			COREBROWSER = WittyFile(self, 'COREBROWSER', True)
+			COREBROWSER.loadFiles(os.path.join(sublime.packages_path(), "Witty", "core"), 'browser')
+
+			self.intelBrowser.files['COREBROWSER_FILE_WITTY'] = COREBROWSER
+
+			# The jar is empty, so start the parser
 			self.parseFiles()
 
 	# Try to get restore data previously put on the disk
@@ -446,12 +462,22 @@ class WittyProject:
 
 	## Get the scope from a specific file
 	def getScope(self, filename, scopename):
+
+		fileLanguage = self.getFileLanguage(filename)
+
+		if fileLanguage == 'nodejs':
+			intel = self.intelNode
+		elif fileLanguage == 'browser':
+			intel = self.intelBrowser
+		else:
+			intel = self.intelNode
+
 		pr('Looking for scope "' + scopename + '" in file ' + filename)
-		return self.intel.getScope(filename, scopename)
+		return intel.getScope(filename, scopename)
 
 class Intel:
 
-	def __init__(self, project):
+	def __init__(self, project, language):
 
 		# The parent project
 		self.project = project
@@ -464,6 +490,9 @@ class Intel:
 
 		# Files
 		self.files = {}
+
+		# The language
+		self.language = language
 
 		self.reset()
 
@@ -501,6 +530,8 @@ class Intel:
 
 			# Disable json file loads
 			#if not filename.endswith('.js'): continue
+
+			pr(wittyFile)
 
 			# Prepare all the scopes
 			# Here, we assume the file itself is also a scope
@@ -545,10 +576,10 @@ class Intel:
 				for name, varinfo in scope['variables'].items():
 					targetScope.addVariable(False, varinfo)
 
-				wf.log(scope, 'witty-simplescopes', True)
+				wf.log(scope, 'witty-' + self.language + '-simplescopes', True)
 
 			for i, scope in scopeMap.items():
-				wf.log(scope, 'witty-WTScopes')
+				wf.log(scope, 'witty-' + self.language + '-WTScopes')
 
 			self.registerTypes()
 
@@ -557,9 +588,9 @@ class Intel:
 		# 	wf.log('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n'*3, 'witty-final-variables')
 			
 		for scope in self.scopes:
-			wf.log('\n\n>>\nScope: ' + str(scope.name), 'witty-final-variables')
-			wf.log((('>>>'*20) + '\n')*2, 'witty-final-variables')
-			wf.log(scope.variables, 'witty-final-variables', True)
+			wf.log('\n\n>>\nScope: ' + str(scope.name), 'witty-' + self.language + '-final-variables')
+			wf.log((('>>>'*20) + '\n')*2, 'witty-' + self.language + '-final-variables')
+			wf.log(scope.variables, 'witty-' + self.language + '-final-variables', True)
 
 
 

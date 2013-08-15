@@ -1,107 +1,111 @@
 {
-	"global": {
-		"description": "The global object in node.js",
-		"name": "global",
-		"type": "Object",
-		"properties": {}
-	},
-	"process": {
-		"description": "The process object is a global object and can be accessed from anywhere. It is an instance of EventEmitter.",
-		"name": "process",
-		"type": "EventEmitter",
-		"properties": {}
-	},
-	"console": {
-		"description": null,
-		"name": "console",
-		"type": "Object",
-		"properties": {
-			"log": {
-				"description": "Prints to stdout with newline. This function can take multiple arguments in a printf()-like way.",
-				"name": "log",
-				"type": "Function"
-			},
-			"info": {
-				"description": "Prints to stdout with newline. This function can take multiple arguments in a printf()-like way.",
-				"name": "info",
-				"type": "Function"
-			},
-			"error": {
-				"description": "Same as console.log but prints to stderr.",
-				"name": "error",
-				"type": "Function"
-			},
-			"warn": {
-				"description": "Same as console.log but prints to stderr.",
-				"name": "warn",
-				"type": "Function"
-			},
-			"time": {
-				"description": "Mark a time.",
-				"name": "time",
-				"type": "Function"
-			},
-			"timeEnd": {
-				"description": "Finish timer, record output.",
-				"name": "timeEnd",
-				"type": "Function"
-			},
-			"trace": {
-				"description": "Print a stack trace to stderr of the current position.",
-				"name": "trace",
-				"type": "Function"
-			},
-			"assert": {
-				"description": "Same as assert.ok() where if the expression evaluates as false throw an AssertionError with message.",
-				"name": "assert",
-				"type": "Function"
+	"languages": ["nodejs"],
+	"scope": 0,
+	"variables": {
+		"global": {
+			"description": "The global object in node.js",
+			"name": "global",
+			"type": "Object",
+			"properties": {}
+		},
+		"process": {
+			"description": "The process object is a global object and can be accessed from anywhere. It is an instance of EventEmitter.",
+			"name": "process",
+			"type": "EventEmitter",
+			"properties": {}
+		},
+		"console": {
+			"description": null,
+			"name": "console",
+			"type": "Object",
+			"properties": {
+				"log": {
+					"description": "Prints to stdout with newline. This function can take multiple arguments in a printf()-like way.",
+					"name": "log",
+					"type": "Function"
+				},
+				"info": {
+					"description": "Prints to stdout with newline. This function can take multiple arguments in a printf()-like way.",
+					"name": "info",
+					"type": "Function"
+				},
+				"error": {
+					"description": "Same as console.log but prints to stderr.",
+					"name": "error",
+					"type": "Function"
+				},
+				"warn": {
+					"description": "Same as console.log but prints to stderr.",
+					"name": "warn",
+					"type": "Function"
+				},
+				"time": {
+					"description": "Mark a time.",
+					"name": "time",
+					"type": "Function"
+				},
+				"timeEnd": {
+					"description": "Finish timer, record output.",
+					"name": "timeEnd",
+					"type": "Function"
+				},
+				"trace": {
+					"description": "Print a stack trace to stderr of the current position.",
+					"name": "trace",
+					"type": "Function"
+				},
+				"assert": {
+					"description": "Same as assert.ok() where if the expression evaluates as false throw an AssertionError with message.",
+					"name": "assert",
+					"type": "Function"
+				}
 			}
-		}
-	},
-	"Buffer": {
-		"description": "A Buffer is similar to an array of integers but corresponds to a raw memory allocation outside the V8 heap. A Buffer cannot be resized.",
-		"name": "Buffer",
-		"type": "Function",
-		"properties": {}
-	},
-	"require": {
-		"description": "To require modules.",
-		"name": "require",
-		"type": "Function",
-		"properties": {
-			"resolve": {
-				"description": "Use the internal require() machinery to look up the location of a module, but rather than loading the module, just return the resolved filename.",
-				"name": "resolve",
-				"type": "Function"
-			},
-			"cache": {
-				"description": "Modules are cached in this object when they are required. By deleting a key value from this object, the next require will reload the module.",
-				"name": "cache",
-				"type": "Object"
-			},
-			"extensions": {
-				"description": "(DEPRECATED) Instruct require on how to handle certain file extensions.",
-				"name": "extensions",
-				"type": "Object"
+		},
+		"Buffer": {
+			"description": "A Buffer is similar to an array of integers but corresponds to a raw memory allocation outside the V8 heap. A Buffer cannot be resized.",
+			"name": "Buffer",
+			"type": "Function",
+			"properties": {}
+		},
+		"require": {
+			"description": "To require modules.",
+			"name": "require",
+			"type": "Function",
+			"properties": {
+				"resolve": {
+					"description": "Use the internal require() machinery to look up the location of a module, but rather than loading the module, just return the resolved filename.",
+					"name": "resolve",
+					"type": "Function"
+				},
+				"cache": {
+					"description": "Modules are cached in this object when they are required. By deleting a key value from this object, the next require will reload the module.",
+					"name": "cache",
+					"type": "Object"
+				},
+				"extensions": {
+					"description": "(DEPRECATED) Instruct require on how to handle certain file extensions.",
+					"name": "extensions",
+					"type": "Object"
+				}
 			}
+		},
+		"__filename": {
+			"description": "The filename of the code being executed.",
+			"name": "__filename",
+			"type": "String",
+			"properties": {}
+		},
+		"__filename": {
+			"description": "The filename of the code being executed.",
+			"name": "__filename",
+			"type": "String",
+			"properties": {}
+		},
+		"__dirname": {
+			"description": "The name of the directory that the currently executing script resides in.",
+			"name": "__dirname",
+			"type": "String",
+			"properties": {}
 		}
-	},
-	"__filename": {
-		"description": "The filename of the code being executed.",
-		"name": "__filename",
-		"type": "String",
-		"properties": {}
-	},
-	"__filename": {
-		"description": "The filename of the code being executed.",
-		"name": "__filename",
-		"type": "String",
-		"properties": {}
-	},
-	"__dirname": {
-		"description": "The name of the directory that the currently executing script resides in.",
-		"name": "__dirname",
-		"type": "String",
-		"properties": {}
 	}
 }

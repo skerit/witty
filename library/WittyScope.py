@@ -56,6 +56,9 @@ class WittyScope:
 		# Store the project
 		self.project = parent.project
 
+		# Get the parent intel
+		self.intel = parent.intel
+
 		self.init()
 
 	## Another constructor for creating new objects
@@ -68,7 +71,7 @@ class WittyScope:
 	## Get the root scope
 	#  @param   self      The object pointer
 	def getRoot(self):
-		return self.project.intel.root
+		return self.intel.root
 
 	## Add a child scope, and return the new instance
 	#  @param   self      The object pointer
@@ -80,7 +83,7 @@ class WittyScope:
 		# Create a new scope with ourselves as parent
 		newScope = WittyScope(self, parentFile)
 
-		self.project.intel.registerScope(newScope)
+		self.intel.registerScope(newScope)
 
 		# Return the new scope
 		return newScope
@@ -237,7 +240,7 @@ class WittyScope:
 			else:
 
 				# Create a new empty variable (with the id set)
-				newVar = self.project.intel.createEmptyVariable()
+				newVar = self.intel.createEmptyVariable()
 
 				# @todo: In node.js you can't set something to the global by just omitting var
 				# So we'll have to find something for that
@@ -255,7 +258,7 @@ class WittyScope:
 			if existingVar:
 				newVar = existingVar
 			else:
-				newVar = self.project.intel.createEmptyVariable()
+				newVar = self.intel.createEmptyVariable()
 
 		# Set the scope
 		newVar.setScope(useScope)

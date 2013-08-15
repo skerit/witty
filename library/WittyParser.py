@@ -31,8 +31,9 @@ class WittyParser(threading.Thread):
 
 		sublime.status_message('Witty has finished parsing')
 
-		# Fire the postParse function
-		self.project.intel.postParse()
+		# Fire the postParse function for both languages
+		self.project.intelNode.postParse()
+		self.project.intelBrowser.postParse()
 
 		# Store the data on disk
 		self.project.storeOnDisk()
@@ -77,4 +78,8 @@ class WittyParser(threading.Thread):
 
 			# If we got a new WittyFile instance, store it in the project
 			if fileResult:
-				self.project.intel.files[fileName] = fileResult
+
+				if fileResult.language == 'nodejs':
+					self.project.intelNode.files[fileName] = fileResult
+				else:
+					self.project.intelBrowser.files[fileName] = fileResult

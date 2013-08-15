@@ -44,7 +44,7 @@ class WittyFile:
 		# See if the language is set already
 		self.language = project.getFileLanguage(fileName)
 
-		pr('Language is ' + str(self.language))
+		self.intel = None
 
 		# Open the original file
 		if not core:
@@ -66,16 +66,28 @@ class WittyFile:
 			splitStatements = wf.splitStatements(self.original, 1)
 			self.objStatements = self.parseStatements(splitStatements, 1)
 
-			wf.log(self.scopes, 'scopes')
+			wf.log(self.scopes, self.language + 'scopes')
 			wf.log({fileName: splitStatements, 'scopes': self.scopes})
-			wf.log(self.objStatements, 'witty-objstatements')
+			wf.log(self.objStatements, 'witty-' + self.language + '-objstatements')
 
 			# Recursively go through all the statements in this file
 			for stat in self.objStatements:
 				WittyStatement(self, stat)
 
 			for s in self.statements:
-				wf.log(s, 'witty-statements')
+				wf.log(s, 'witty-' + self.language + '-statements')
+
+		self.setIntel()
+
+	## Set the correct intel for this file
+	def setIntel(self):
+
+		if self.language == 'nodejs':
+			self.intel = self.project.intelNode
+		elif self.language == 'browser':
+			self.intel = self.project.intelBrowser
+		else:
+			self.intel = self.project.intelNode
 
 	## Get the language of this file
 	def detectLanguage(self, noSideEffect = False):
@@ -111,27 +123,38 @@ class WittyFile:
 	def setLanguage(self, language):
 
 		self.language = language
+		self.setIntel()
 		self.project.setFileLanguage(self.fileName, language)
 
-
 	# Load in json files
-	def loadFiles(self, directory, scopeId = 0):
+	def loadFiles(self, directory, language):
 
-		targetScope = self.scopes[scopeId]
+		self.language = language
 
-		pr('\n\n\n>>>>>>>> Loading files!')
 		for root, dirs, files in os.walk(directory, topdown=True):
 			for fileName in files:
 				filePath = os.path.join(root, fileName)
 				tempFile = open(filePath, 'rU')
 				json_data = tempFile.read()
+				tempFile.close()
 
 				try:
 					data = json.loads(json_data)
-					targetScope['variables'].update(data)
 				except ValueError:
 					pr('Error decoding JSON file ' + filePath)
-				tempFile.close()
+					continue
+
+				targetScopeId = data['scope']
+				targetLanguage = data['languages']
+
+				# If this fiel is not meant for this language, skip it
+				if not language in targetLanguage:
+					continue
+
+				# @todo: scope's above 0 should be loaded differently!
+				targetScope = self.scopes[targetScopeId]
+				targetScope['variables'].update(data['variables'])
+
 
 	# Parsing statements begins here
 	def parseStatements(self, workingStatements, scopeId = 1):
