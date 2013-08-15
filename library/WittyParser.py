@@ -23,7 +23,7 @@ class WittyParser(threading.Thread):
 	def run(self):
 		
 		# Loop through every folder in the project
-		for folder in self.project.folders:
+		for folder, data in self.project.folders.items():
 			# Get all the javascript files in the project
 			jsFiles = self.getJavascriptFiles(folder)
 			for fileName in jsFiles:

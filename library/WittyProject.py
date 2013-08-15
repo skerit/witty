@@ -21,7 +21,30 @@ parserThreads = {}
 class WittyProject:
 
 	# WittyProject Constructor
-	def __init__(self, folders):
+	def __init__(self, window):
+
+		# Store the window in here
+		self.window = window
+
+		# Get all the folders in this project
+		folders = window.folders()
+
+		# The project data
+		self.projectData = window.project_data()
+
+		# Make sure a witty entry is made
+		if not 'witty' in self.projectData:
+			self.projectData['witty'] = {'folders': {}}
+
+		self.folderArray = folders
+		self.folders = self.projectData['witty']['folders']
+
+		# Store the folders
+		for path in folders:
+
+			if not path in self.folders:
+				self.folders[path] = {}
+
 
 		# Update the final hash
 		self.id = wf.generateHash(folders)
@@ -29,15 +52,107 @@ class WittyProject:
 		# The pickle filename
 		self.pickleFileName = '/dev/shm/wittypickle-' + self.id
 
-		# Store the folders
-		self.folders = folders
-
 		# The Single Point Of Contact to get data
 		self.intel = None
 
 		# Init the intel
 		self._initIntel()
-		
+
+	## Get the language type of a file
+	def getFileLanguage(self, filepath):
+
+		fileInfo = self.getFileInfo(filepath)
+
+		if fileInfo:
+			pr(fileInfo)
+			baseFolder = fileInfo['base']
+			fileName = fileInfo['file']
+		else:
+			return False
+
+		# If the basefolder is found, and it's in the folders dict
+		if baseFolder and baseFolder in self.folders:
+			try:
+				return self.folders[baseFolder][fileName]['language']
+			except KeyError:
+				return None
+		else:
+			return False
+
+	## Set a file's language
+	def setFileLanguage(self, filepath, language):
+
+		fileInfo = self.getFileInfo(filepath)
+
+		if fileInfo:
+			baseFolder = fileInfo['base']
+			fileName = fileInfo['file']
+
+			if not fileName in self.folders[baseFolder]:
+				self.folders[baseFolder][fileName] = {'language': None}
+
+			self.folders[baseFolder][fileName]['language'] = language
+
+			# Set the project data
+			self.window.set_project_data(self.projectData)
+
+			return True
+		else:
+			return False
+
+	## Get a filepath info
+	def getFileInfo(self, filepath):
+
+		baseFolder = None
+		fileName = None
+
+		# First we need to find out what base folder this is in
+		for path in self.folderArray:
+			if filepath.startswith(path):
+				baseFolder = path
+
+				# Get the filename, without leading /
+				fileName = filepath[len(path)+1:]
+
+				return {'base': baseFolder, 'file': fileName}
+
+		return False
+
+	## On file open
+	def onFileOpen(self, view):
+
+		# See if the file language is already set
+		setLanguage = self.getFileLanguage(view.file_name())
+
+		if setLanguage:
+
+			if setLanguage == 'browser':
+				view.set_syntax_file('Packages/JavaScript/JavaScript.tmLanguage')
+			elif setLanguage == 'nodejs':
+				view.set_syntax_file('Packages/Witty/nodejs.tmLanguage')
+
+	## Get the syntax setting
+	def getSyntaxSetting(self, view):
+
+		syntax = view.settings().get('syntax').split('/')[-1]
+
+		pr(view.settings().get('syntax'))
+
+		# Packages/JavaScript/JavaScript.tmLanguage
+		if syntax == 'JavaScript.tmLanguage':
+			syntax = 'browser'
+		# Packages/Witty/nodejs.tmLanguage
+		elif syntax == 'nodejs.tmLanguage':
+			syntax = 'nodejs'
+
+		return syntax
+
+	## On file save, called right before paseFiles
+	def onFileSave(self, view):
+
+		language = self.getSyntaxSetting(view)
+		self.setFileLanguage(view.file_name(), language)
+
 	# Begin parsing files
 	def parseFiles(self, savedFileName = ''):
 		

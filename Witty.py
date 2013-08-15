@@ -72,7 +72,16 @@ class WittyCommand(sublime_plugin.EventListener):
 		self.allProjects = {}
 
 		for window in sublime.windows():
-			newProject = WittyProject(window.folders())
+
+			pr(window.folders())
+
+			for view in window.views():
+				pr(view)
+				pr(view.settings().get('syntax').split('/')[-1])
+			
+			#die()
+
+			newProject = WittyProject(window)
 			self.allProjects[newProject.id] = newProject
 
 			info('\n\n', False)
@@ -97,7 +106,7 @@ class WittyCommand(sublime_plugin.EventListener):
 	def on_post_save_async(self, view):
 		
 		savedFileName = view.file_name()
-
+		
 		if savedFileName.count('Witty.py'):
 			return False
 
@@ -105,6 +114,7 @@ class WittyCommand(sublime_plugin.EventListener):
 		project = self.getProject(view)
 
 		if project:
+			project.onFileSave(view)
 			project.parseFiles(savedFileName)
 
 	# Query completions
@@ -114,6 +124,14 @@ class WittyCommand(sublime_plugin.EventListener):
 
 		if project:
 			return project.queryForCompletions(view, prefix, locations)
+
+	## A file is opened
+	def on_load_async(self, view):
+
+		project = self.getProject(view)
+
+		if project:
+			return project.onFileOpen(view)
 	
 class WittyReindexProjectCommand(sublime_plugin.ApplicationCommand):
 

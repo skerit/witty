@@ -1032,6 +1032,9 @@ def tokenizeExpression(text):
 	# Strip the text of extra whitespaces
 	text = text.strip()
 
+	# the length of the text
+	length = len(text)
+
 	# Returnvalues
 	result = []
 
@@ -1067,7 +1070,7 @@ def tokenizeExpression(text):
 		elif c == '=':
 			token['type'] = 'assignment'
 			token['text'] = '='
-		elif c == '/' and text[i+1] == '*':
+		elif (i+1) < length and c == '/' and text[i+1] == '*':
 			(tresult, tendId, tnewLines) = extractGreedy(text[i:], '/*', '*/')
 			token['type'] = 'docblock'
 			token['text'] = tresult

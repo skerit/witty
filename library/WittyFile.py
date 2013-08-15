@@ -41,6 +41,11 @@ class WittyFile:
 
 		self.root = {}
 
+		# See if the language is set already
+		self.language = project.getFileLanguage(fileName)
+
+		pr('Language is ' + str(self.language))
+
 		# Open the original file
 		if not core:
 			fileHandle = open(fileName, 'rU')
@@ -53,6 +58,9 @@ class WittyFile:
 
 			# Close the file
 			fileHandle.close()
+
+			# Do we have to get the language of the file?
+			self.detectLanguage()
 
 			# Recursively split all the statements
 			splitStatements = wf.splitStatements(self.original, 1)
@@ -68,6 +76,43 @@ class WittyFile:
 
 			for s in self.statements:
 				wf.log(s, 'witty-statements')
+
+	## Get the language of this file
+	def detectLanguage(self, noSideEffect = False):
+
+		if self.language:
+			return self.language
+
+		# @todo: Remove strings & comments before detecting keywords
+
+		# The counts
+		node = 0
+		browser = 0
+
+		# Default is node
+		result = 'nodejs'
+
+		# Count node keywords
+		for keyword in ['require(', 'global.', 'module.', 'module.exports', 'process.']:
+			node += self.original.count(keyword)
+
+		# Count browser keywords
+		for keyword in ['window', 'document', 'getElementById', 'document.createElement']:
+			browser += self.original.count(keyword)
+
+		if browser > node:
+			result = 'javascript'
+
+		if not noSideEffect: self.setLanguage(result)
+
+		return result
+
+	## Set the language of this file
+	def setLanguage(self, language):
+
+		self.language = language
+		self.project.setFileLanguage(self.fileName, language)
+
 
 	# Load in json files
 	def loadFiles(self, directory, scopeId = 0):
